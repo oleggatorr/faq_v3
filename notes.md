@@ -301,3 +301,223 @@ text
 - get_webhook_events() - доступные типы событий
 - pause_webhook() - приостановка вебхука
 - resume_webhook() - возобновление вебхука
+
+
+
+
+
+Описание бд
+-- faq_db_v1.agents определение
+
+CREATE TABLE `agents` (
+  `id` mediumint unsigned NOT NULL AUTO_INCREMENT,
+  `full_name` varchar(200) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'ФИО сотрудника',
+  `email` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'Email для входа',
+  `password_hash` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'Хеш пароля',
+  `role` enum('admin','operator','readonly') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'operator' COMMENT 'Роль пользователя',
+  `department_id` smallint unsigned DEFAULT NULL COMMENT 'Департамент сотрудника',
+  `is_active` tinyint unsigned NOT NULL DEFAULT '1' COMMENT 'Активен ли сотрудник',
+  `phone` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'Телефон',
+  `avatar_path` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'Путь к аватару',
+  `last_login_at` timestamp NULL DEFAULT NULL COMMENT 'Последний вход',
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_email` (`email`),
+  KEY `idx_department` (`department_id`),
+  KEY `idx_active` (`is_active`),
+  KEY `idx_role` (`role`),
+  CONSTRAINT `fk_agents_department` FOREIGN KEY (`department_id`) REFERENCES `departments` (`id`) ON DELETE SET NULL ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Сотрудники поддержки';
+
+-- faq_db_v1.attachments определение
+
+CREATE TABLE `attachments` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `message_id` int unsigned NOT NULL,
+  `original_filename` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `stored_filename` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `file_path` varchar(500) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `file_size` int unsigned NOT NULL,
+  `mime_type` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `file_hash` char(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `uploaded_by_agent_id` mediumint unsigned DEFAULT NULL,
+  `uploaded_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `download_count` int unsigned NOT NULL DEFAULT '0',
+  PRIMARY KEY (`id`),
+  KEY `idx_message` (`message_id`),
+  KEY `idx_uploaded_by` (`uploaded_by_agent_id`),
+  KEY `idx_hash` (`file_hash`),
+  KEY `idx_stored_filename` (`stored_filename`),
+  CONSTRAINT `fk_attachments_agent` FOREIGN KEY (`uploaded_by_agent_id`) REFERENCES `agents` (`id`) ON DELETE SET NULL ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- faq_db_v1.departments определение
+
+CREATE TABLE `departments` (
+  `id` smallint unsigned NOT NULL AUTO_INCREMENT,
+  `name` varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'Название департамента',
+  `description` text COLLATE utf8mb4_unicode_ci COMMENT 'Описание',
+  `email` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'Email для уведомлений',
+  `is_active` tinyint unsigned NOT NULL DEFAULT '1' COMMENT 'Активен ли департамент',
+  `sort_order` smallint unsigned NOT NULL DEFAULT '0' COMMENT 'Порядок сортировки',
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_active` (`is_active`),
+  KEY `idx_sort` (`sort_order`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Департаменты поддержки';
+
+-- faq_db_v1.languages определение
+
+CREATE TABLE `languages` (
+  `id` tinyint unsigned NOT NULL AUTO_INCREMENT,
+  `code` varchar(10) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `name` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `native_name` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `locale` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `is_active` tinyint unsigned NOT NULL DEFAULT '1',
+  `is_default` tinyint unsigned NOT NULL DEFAULT '0',
+  `sort_order` tinyint unsigned NOT NULL DEFAULT '0',
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_code` (`code`),
+  KEY `idx_is_default` (`is_default`)
+) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- faq_db_v1.messages определение
+
+CREATE TABLE `messages` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `ticket_id` mediumint unsigned NOT NULL,
+  `agent_id` mediumint unsigned DEFAULT NULL,
+  `customer_name` varchar(200) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `customer_email` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `subject` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `body` mediumtext COLLATE utf8mb4_unicode_ci NOT NULL,
+  `is_internal` tinyint unsigned NOT NULL DEFAULT '0',
+  `is_automatic` tinyint unsigned NOT NULL DEFAULT '0',
+  `ip_address` varchar(45) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_ticket` (`ticket_id`),
+  KEY `idx_agent` (`agent_id`),
+  KEY `idx_created_at` (`created_at`),
+  KEY `idx_internal` (`is_internal`),
+  KEY `idx_ticket_created` (`ticket_id`,`created_at`),
+  CONSTRAINT `fk_messages_agent` FOREIGN KEY (`agent_id`) REFERENCES `agents` (`id`) ON DELETE SET NULL ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- faq_db_v1.question_categories определение
+
+CREATE TABLE `question_categories` (
+  `id` smallint unsigned NOT NULL AUTO_INCREMENT,
+  `name` varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'Название категории',
+  `description` text COLLATE utf8mb4_unicode_ci COMMENT 'Описание категории',
+  `department_id` smallint unsigned DEFAULT NULL COMMENT 'Привязка к департаменту',
+  `parent_id` smallint unsigned DEFAULT NULL COMMENT 'Родительская категория (для иерархии)',
+  `icon` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'Иконка категории',
+  `color` varchar(7) COLLATE utf8mb4_unicode_ci DEFAULT '#999999' COMMENT 'Цвет для UI',
+  `is_active` tinyint unsigned NOT NULL DEFAULT '1',
+  `sort_order` smallint unsigned NOT NULL DEFAULT '0',
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_department` (`department_id`),
+  KEY `idx_parent` (`parent_id`),
+  KEY `idx_active` (`is_active`),
+  KEY `idx_sort` (`sort_order`),
+  CONSTRAINT `fk_qcat_department` FOREIGN KEY (`department_id`) REFERENCES `departments` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
+  CONSTRAINT `fk_qcat_parent` FOREIGN KEY (`parent_id`) REFERENCES `question_categories` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Категории вопросов клиентов';
+
+-- faq_db_v1.ticket_events определение
+
+CREATE TABLE `ticket_events` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `ticket_id` mediumint unsigned NOT NULL,
+  `agent_id` mediumint unsigned DEFAULT NULL,
+  `action_type` enum('created','replied','status_changed','priority_changed','assigned','unassigned','category_changed','merged','closed','reopened','locked','unlocked','note_added','attachment_added','customer_replied') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `field_name` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `old_value` text COLLATE utf8mb4_unicode_ci,
+  `new_value` text COLLATE utf8mb4_unicode_ci,
+  `comment` text COLLATE utf8mb4_unicode_ci,
+  `occurred_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_ticket` (`ticket_id`),
+  KEY `idx_agent` (`agent_id`),
+  KEY `idx_action_type` (`action_type`),
+  KEY `idx_occurred_at` (`occurred_at`),
+  KEY `idx_ticket_occurred` (`ticket_id`,`occurred_at`),
+  CONSTRAINT `fk_events_agent` FOREIGN KEY (`agent_id`) REFERENCES `agents` (`id`) ON DELETE SET NULL ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- faq_db_v1.ticket_statuses определение
+
+CREATE TABLE `ticket_statuses` (
+  `id` tinyint unsigned NOT NULL AUTO_INCREMENT,
+  `code` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `name` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `color` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT '#999999',
+  `is_closed` tinyint unsigned NOT NULL DEFAULT '0',
+  `is_default` tinyint unsigned NOT NULL DEFAULT '0',
+  `sort_order` tinyint unsigned NOT NULL DEFAULT '0',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_code` (`code`),
+  KEY `idx_is_default` (`is_default`)
+) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- faq_db_v1.tickets определение
+
+CREATE TABLE `tickets` (
+  `id` mediumint unsigned NOT NULL AUTO_INCREMENT,
+  `track_id` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'Уникальный публичный идентификатор',
+  `customer_name` varchar(200) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'Имя клиента',
+  `customer_email` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'Email клиента',
+  `customer_ip` varchar(45) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'IP адрес клиента',
+  `department_id` smallint unsigned NOT NULL COMMENT 'Департамент',
+  `language_id` tinyint unsigned DEFAULT NULL COMMENT 'Язык обращения',
+  `category_id` smallint unsigned DEFAULT NULL COMMENT 'Категория вопроса',
+  `status_id` tinyint unsigned NOT NULL DEFAULT '1' COMMENT 'Статус тикета',
+  `priority` enum('low','normal','high','urgent') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'normal' COMMENT 'Приоритет',
+  `subject` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'Тема обращения',
+  `preview_message` text COLLATE utf8mb4_unicode_ci COMMENT 'Превью первого сообщения',
+  `owner_id` mediumint unsigned DEFAULT NULL COMMENT 'Ответственный агент',
+  `opened_by_id` mediumint unsigned DEFAULT NULL COMMENT 'Кто создал (агент или NULL)',
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `first_responded_at` timestamp NULL DEFAULT NULL COMMENT 'Первый ответ агента',
+  `closed_at` timestamp NULL DEFAULT NULL COMMENT 'Время закрытия',
+  `closed_by_id` mediumint unsigned DEFAULT NULL COMMENT 'Кто закрыл',
+  `is_archived` tinyint unsigned NOT NULL DEFAULT '0' COMMENT 'В архиве',
+  `is_locked` tinyint unsigned NOT NULL DEFAULT '0' COMMENT 'Заблокирован для ответов',
+  `merged_into_id` mediumint unsigned DEFAULT NULL COMMENT 'Ссылка на главный тикет',
+  `messages_count` smallint unsigned NOT NULL DEFAULT '0' COMMENT 'Количество сообщений',
+  `attachments_count` smallint unsigned NOT NULL DEFAULT '0' COMMENT 'Количество вложений',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_track_id` (`track_id`),
+  KEY `idx_department` (`department_id`),
+  KEY `idx_status` (`status_id`),
+  KEY `idx_priority` (`priority`),
+  KEY `idx_owner` (`owner_id`),
+  KEY `idx_customer_email` (`customer_email`),
+  KEY `idx_created_at` (`created_at`),
+  KEY `idx_updated_at` (`updated_at`),
+  KEY `idx_merged` (`merged_into_id`),
+  KEY `idx_archived` (`is_archived`),
+  KEY `idx_status_created` (`status_id`,`created_at`),
+  KEY `idx_owner_status` (`owner_id`,`status_id`),
+  KEY `fk_tickets_opened_by` (`opened_by_id`),
+  KEY `fk_tickets_closed_by` (`closed_by_id`),
+  KEY `idx_language` (`language_id`),
+  KEY `idx_category` (`category_id`),
+  CONSTRAINT `fk_tickets_category` FOREIGN KEY (`category_id`) REFERENCES `question_categories` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
+  CONSTRAINT `fk_tickets_closed_by` FOREIGN KEY (`closed_by_id`) REFERENCES `agents` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
+  CONSTRAINT `fk_tickets_department` FOREIGN KEY (`department_id`) REFERENCES `departments` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `fk_tickets_language` FOREIGN KEY (`language_id`) REFERENCES `languages` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
+  CONSTRAINT `fk_tickets_merged` FOREIGN KEY (`merged_into_id`) REFERENCES `tickets` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
+  CONSTRAINT `fk_tickets_opened_by` FOREIGN KEY (`opened_by_id`) REFERENCES `agents` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
+  CONSTRAINT `fk_tickets_owner` FOREIGN KEY (`owner_id`) REFERENCES `agents` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
+  CONSTRAINT `fk_tickets_status` FOREIGN KEY (`status_id`) REFERENCES `ticket_statuses` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Тикеты обращений';

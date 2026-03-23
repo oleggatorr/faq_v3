@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+from typing import Any
+
 from sqlalchemy.orm import Session
 
 from app.models.agent import Agent
-from app.schemas.agent import AgentCreate, AgentRead
+from app.schemas.agent import AgentCreate, AgentRead, AgentUpdate
+from app.schemas.deletion import DeleteResponse
 
 from .errors import NotFound
+from .utils import apply_filters, apply_sort
 
 
 class AgentService:
@@ -41,4 +45,89 @@ class AgentService:
         if agent is None:
             raise NotFound("Agent not found")
         return AgentRead.model_validate(agent)
+
+    def list(
+        self,
+        *,
+        filters: dict[str, Any] | None = None,
+        sort_by: str = "id",
+        sort_desc: bool = False,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> list[AgentRead]:
+        allowed_filters = {
+            "id",
+            "full_name",
+            "email",
+            "role",
+            "department_id",
+            "is_active",
+            "phone",
+            "last_login_at",
+        }
+        allowed_sort = {
+            "id",
+            "full_name",
+            "email",
+            "role",
+            "department_id",
+            "is_active",
+            "last_login_at",
+            "created_at",
+            "updated_at",
+        }
+
+        if filters:
+            unknown = set(filters.keys()) - allowed_filters
+            if unknown:
+                raise ValueError(f"Unknown filter fields: {', '.join(sorted(unknown))}")
+
+        query = self.session.query(Agent)
+        query = apply_filters(
+            query,
+            Agent,
+            filters=filters,
+            text_like_fields={"full_name", "email", "phone"},
+        )
+        query = apply_sort(query, Agent, sort_by=sort_by, sort_desc=sort_desc, allowed_sort_fields=allowed_sort)
+        agents = query.offset(offset).limit(limit).all()
+        return [AgentRead.model_validate(a) for a in agents]
+
+    def update(
+        self,
+        *,
+        agent_id: int,
+        agent_data: AgentUpdate,
+        commit: bool = True,
+    ) -> Agent:
+        agent = self.session.query(Agent).filter(Agent.id == agent_id).one_or_none()
+        if agent is None:
+            raise NotFound("Agent not found")
+
+        updates = agent_data.model_dump(exclude_none=True)
+        for k, v in updates.items():
+            setattr(agent, k, v)
+
+        if commit:
+            self.session.commit()
+        else:
+            self.session.flush()
+        return agent
+
+    def delete(
+        self,
+        *,
+        agent_id: int,
+        commit: bool = True,
+    ) -> DeleteResponse:
+        agent = self.session.query(Agent).filter(Agent.id == agent_id).one_or_none()
+        if agent is None:
+            return DeleteResponse(success=False, deleted_id=None, detail="Agent not found")
+
+        self.session.delete(agent)
+        if commit:
+            self.session.commit()
+        else:
+            self.session.flush()
+        return DeleteResponse(success=True, deleted_id=agent_id)
 

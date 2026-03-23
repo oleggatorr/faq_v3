@@ -18,8 +18,8 @@ class Agent(Base):
     password_hash = Column(String(255), nullable=False)
     role = Column(SQLEnum(AgentRole), nullable=False, default=AgentRole.operator)
 
-    category_access = Column(Text, nullable=False, default="", server_default="")
-    permissions = Column(Text, nullable=False, default="", server_default="")
+    category_access = Column(Text, nullable=False, default="")
+    permissions = Column(Text, nullable=False, default="")
     
     department_id = Column(Integer, ForeignKey("departments.id", ondelete="SET NULL", onupdate="CASCADE"), nullable=True, index=True)
     

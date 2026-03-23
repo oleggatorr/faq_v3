@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, BigInteger
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from .base import Base
@@ -16,7 +16,7 @@ class Attachment(Base):
     mime_type = Column(String(100), nullable=False)
     file_hash = Column(String(64), nullable=True, index=True)
     
-    uploaded_by_agent_id = Column(BigInteger, ForeignKey("agents.id", ondelete="SET NULL", onupdate="CASCADE"), nullable=True, index=True)
+    uploaded_by_agent_id = Column(Integer, ForeignKey("agents.id", ondelete="SET NULL", onupdate="CASCADE"), nullable=True, index=True)
     uploaded_at = Column(DateTime(timezone=True), server_default=func.now())
     download_count = Column(Integer, default=0, nullable=False)
 

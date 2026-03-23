@@ -25,8 +25,8 @@ class TicketEvent(Base):
     __tablename__ = "ticket_events"
 
     id = Column(BigInteger, primary_key=True, autoincrement=True)
-    ticket_id = Column(BigInteger, ForeignKey("tickets.id", ondelete="CASCADE"), nullable=False, index=True)
-    agent_id = Column(BigInteger, ForeignKey("agents.id", ondelete="SET NULL", onupdate="CASCADE"), nullable=True, index=True)
+    ticket_id = Column(Integer, ForeignKey("tickets.id", ondelete="CASCADE"), nullable=False, index=True)
+    agent_id = Column(Integer, ForeignKey("agents.id", ondelete="SET NULL", onupdate="CASCADE"), nullable=True, index=True)
     
     action_type = Column(SQLEnum(EventType), nullable=False, index=True)
     field_name = Column(String(100), nullable=True)

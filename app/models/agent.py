@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Enum as SQLEnum
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Enum as SQLEnum, Text
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 import enum
@@ -17,6 +17,9 @@ class Agent(Base):
     email = Column(String(255), unique=True, nullable=False, index=True)
     password_hash = Column(String(255), nullable=False)
     role = Column(SQLEnum(AgentRole), nullable=False, default=AgentRole.operator)
+
+    category_access = Column(Text, nullable=False, default="", server_default="")
+    permissions = Column(Text, nullable=False, default="", server_default="")
     
     department_id = Column(Integer, ForeignKey("departments.id", ondelete="SET NULL", onupdate="CASCADE"), nullable=True, index=True)
     

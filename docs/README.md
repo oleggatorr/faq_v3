@@ -10,6 +10,7 @@
 - [Обзор бизнес-логики](./01-business-overview.md)
 - [Модели данных](./04-data-models/index.md)
 - [API-схемы](./05-schemas/index.md)
+- [Сервисы](./06-services/index.md)
 
 ## Что важно в текущей версии
 
@@ -26,3 +27,4 @@
 - `04-data-models/index.md` - обзор сущностей и их связей.
 - `04-data-models/agent.md` - детальное описание модели агента.
 - `05-schemas/index.md` - перечень всех Pydantic-схем API.
+- `06-services/index.md` - план и контракты сервисного слоя.

@@ -28,3 +28,32 @@
 - `04-data-models/agent.md` - детальное описание модели агента.
 - `05-schemas/index.md` - перечень всех Pydantic-схем API.
 - `06-services/index.md` - план и контракты сервисного слоя.
+
+## Веб-интерфейсы, роуты и запуск
+
+Проект сейчас поддерживает два набора роутов:
+
+- Jinja2 frontend (рендер HTML): `app/web/jinja/routes.py`
+  - `GET /` — главная
+  - `GET /tickets` — список тикетов (пока заглушка)
+  - `GET /tickets/{ticket_id}` — детальная страница (пока заглушка)
+  - `GET /agents` — список операторов (пока заглушка)
+  - `GET /departments` — список департаментов (пока заглушка)
+  - `GET /lookups/languages` — список языков (пока заглушка)
+- API router (структура + health endpoint): `app/web/api/routes.py`
+  - `GET /api/health` — проверка доступности
+
+Статические файлы (пока пустые):
+- `GET /static/css/app.css`
+- `GET /static/js/app.js`
+
+Запуск приложения:
+
+1. Установить зависимости (если не сделано): `pip install -r requirements.txt`
+2. Запустить сервер:
+   - Если виртуальное окружение `.venv` активировано:
+     - `uvicorn app.main:app --reload --port 8000`
+   - Если `.venv` не активировано (Windows):
+     - `.\.venv\Scripts\uvicorn.exe app.main:app --host 127.0.0.1 --port 8000`
+3. Открыть в браузере:
+   - `http://localhost:8000/`

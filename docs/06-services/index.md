@@ -18,6 +18,33 @@
 
 Ниже фиксируем планируемые сервисы и их ответственность.
 
+## Текущий статус реализации
+
+Сейчас в `app/services/` реализованы CRUD/list методы (с фильтрами и сортировкой) для справочников и основных доменных сервисов:
+- `AgentService`, `DepartmentService`, `LanguageService`, `TicketStatusService`, `QuestionCategoryService`
+- `TicketService`, `MessageService`, `AttachmentService`, `TicketEventService`
+
+Для действий с тикетами записываются `ticket_events`:
+- `TicketService`: статус/владелец/категория/блокировка/мердж/анонимизация и soft-delete
+- `MessageService`: изменения сообщений (note_added/customer_replied/replied)
+- `AttachmentService`: добавление вложений (attachment_added)
+
+## `list()` filters и сортировки (whitelist)
+
+Ниже — какие ключи можно использовать в `filters` и какие поля разрешены для `sort_by` в реализованных `list()` методах.
+
+| Сервис | `filters` keys | `ILIKE` по строкам | `sort_by` whitelist |
+|---|---|---|---|
+| `AgentService` | `id, full_name, email, role, department_id, is_active, phone, last_login_at` | `full_name, email, phone` | `id, full_name, email, role, department_id, is_active, last_login_at, created_at, updated_at` |
+| `DepartmentService` | `id, name, email, is_active, sort_order` | `name, email` | `id, name, email, is_active, sort_order, created_at, updated_at` |
+| `LanguageService` | `id, code, name, is_active, is_default, sort_order, locale` | `code, name, locale, native_name` | `id, code, name, is_active, is_default, sort_order, created_at` |
+| `TicketStatusService` | `id, code, name, is_closed, is_default, sort_order, color` | `code, name, color` | `id, code, name, is_closed, is_default, sort_order, color` |
+| `QuestionCategoryService` | `id, name, department_id, parent_id, icon, color, is_active, sort_order` | `name, icon, color` | `id, name, department_id, parent_id, is_active, sort_order, created_at, updated_at` |
+| `TicketService` | `id, track_id, customer_name, customer_email, department_id, language_id, category_id, status_id, priority, subject, owner_id, opened_by_id, is_archived, is_locked, merged_into_id, messages_count, attachments_count` | `track_id, customer_name, customer_email, subject` | `id, track_id, created_at, updated_at, status_id, priority, is_archived, is_locked, messages_count, attachments_count` |
+| `MessageService` | `id, ticket_id, agent_id, customer_name, customer_email, subject, is_internal, is_automatic, ip_address` | `customer_name, customer_email, subject` | `id, ticket_id, agent_id, created_at, is_internal, is_automatic` |
+| `AttachmentService` | `id, message_id, uploaded_by_agent_id, original_filename, stored_filename, mime_type, file_hash, download_count` | `original_filename, stored_filename, mime_type, file_hash` | `id, message_id, uploaded_by_agent_id, uploaded_at, download_count, file_size` |
+| `TicketEventService` (`list_by_ticket`) | `agent_id, action_type, field_name` | (нет `ILIKE`) | `id, occurred_at, action_type, field_name, agent_id` |
+
 ## Контекст доступа оператора (разделы и действия)
 
 Ниже перечислены доменные “разделы”, по которым оператор может отвечать, и набор действий, которые оператор может выполнять. Эта информация нужна для последующего описания сервисов и правил контроля прав (permissions).

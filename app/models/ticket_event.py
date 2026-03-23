@@ -17,6 +17,8 @@ class EventType(str, enum.Enum):
     reopened = "reopened"
     locked = "locked"
     unlocked = "unlocked"
+    anonymized = "anonymized"
+    archived = "archived"
     note_added = "note_added"
     attachment_added = "attachment_added"
     customer_replied = "customer_replied"

@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block title %}Языки{% endblock %}
+
+{% block content %}
+  <h1>Языки</h1>
+  {% if languages and languages|length > 0 %}
+    <ul>
+      {% for l in languages %}
+        <li>{{ l.id }} / {{ l.code }} / {{ l.name }}</li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p>Пока языки не загружены.</p>
+  {% endif %}
+{% endblock %}
+

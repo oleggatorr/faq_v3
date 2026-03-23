@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block title %}Тикеты{% endblock %}
+
+{% block content %}
+  <h1>Список тикетов</h1>
+  {% if tickets and tickets|length > 0 %}
+    <ul>
+      {% for t in tickets %}
+        <li>
+          <a href="/tickets/{{ t.id }}">{{ t.id }} / {{ t.track_id }}</a>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p>Пока тикеты не загружены.</p>
+  {% endif %}
+{% endblock %}
+

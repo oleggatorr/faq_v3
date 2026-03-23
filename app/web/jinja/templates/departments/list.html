@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block title %}Департаменты{% endblock %}
+
+{% block content %}
+  <h1>Департаменты</h1>
+  {% if departments and departments|length > 0 %}
+    <ul>
+      {% for d in departments %}
+        <li>{{ d.id }} / {{ d.name }}</li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p>Пока департаменты не загружены.</p>
+  {% endif %}
+{% endblock %}
+

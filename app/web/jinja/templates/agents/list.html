@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block title %}Операторы{% endblock %}
+
+{% block content %}
+  <h1>Операторы</h1>
+  {% if agents and agents|length > 0 %}
+    <ul>
+      {% for a in agents %}
+        <li>{{ a.id }} / {{ a.full_name }}</li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p>Пока операторы не загружены.</p>
+  {% endif %}
+{% endblock %}
+

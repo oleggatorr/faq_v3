@@ -103,6 +103,17 @@ class AttachmentService:
             raise NotFound("Attachment not found")
         return AttachmentRead.model_validate(att)
 
+    def get_orm(self, *, attachment_id: int) -> Attachment | None:
+        """Возвращает ORM-объект для доступа к file_path и др."""
+        return self.session.query(Attachment).filter(Attachment.id == attachment_id).one_or_none()
+
+    def increment_download_count(self, *, attachment_id: int, commit: bool = True) -> None:
+        att = self.get_orm(attachment_id=attachment_id)
+        if att is not None:
+            att.download_count = (att.download_count or 0) + 1
+            if commit:
+                self.session.commit()
+
     def list(
         self,
         *,

@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block title %}Категории вопросов{% endblock %}
+
+{% block content %}
+  <h1>Категории вопросов</h1>
+  {% if categories and categories|length > 0 %}
+    <ul>
+      {% for c in categories %}
+        <li>{{ c.id }} — {{ c.name }} {% if c.department_id %}(dept {{ c.department_id }}){% endif %}</li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p>Категории не загружены.</p>
+  {% endif %}
+{% endblock %}

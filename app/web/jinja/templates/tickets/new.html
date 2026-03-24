@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block title %}Создать обращение{% endblock %}
+
+{% block content %}
+  <h1>Новое обращение</h1>
+  {% if error %}
+    <p class="error" style="color: red;">{{ error }}</p>
+  {% endif %}
+  <form method="post" action="/new-ticket" enctype="multipart/form-data">
+    <p>
+      <label>Ваше имя: <input type="text" name="customer_name" value="{{ form_data.customer_name or '' }}" required maxlength="200" /></label>
+    </p>
+    <p>
+      <label>Email: <input type="email" name="customer_email" value="{{ form_data.customer_email or '' }}" required maxlength="255" /></label>
+    </p>
+    <p>
+      <label>Тема: <input type="text" name="subject" value="{{ form_data.subject or '' }}" required maxlength="255" /></label>
+    </p>
+    <p>
+      <label>Департамент:
+        <select name="department_id" required>
+          <option value="">— Выберите —</option>
+          {% for d in departments %}
+            <option value="{{ d.id }}" {% if form_data.department_id == d.id %}selected{% endif %}>{{ d.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    </p>
+    <p>
+      <label>Язык:
+        <select name="language_id">
+          <option value="">— Не указан —</option>
+          {% for lang in languages %}
+            <option value="{{ lang.id }}" {% if form_data.language_id == lang.id %}selected{% endif %}>{{ lang.name }} ({{ lang.code }})</option>
+          {% endfor %}
+        </select>
+      </label>
+    </p>
+    <p>
+      <label>Категория:
+        <select name="category_id">
+          <option value="">— Не указана —</option>
+          {% for c in categories %}
+            <option value="{{ c.id }}" {% if form_data.category_id == c.id %}selected{% endif %}>{{ c.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    </p>
+    <p>
+      <label>Приоритет:
+        <select name="priority">
+          {% for p in priorities %}
+            <option value="{{ p.value }}" {% if (form_data.priority or 'normal') == p.value %}selected{% endif %}>{{ p.value }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    </p>
+    <p>
+      <label>Сообщение:<br />
+        <textarea name="body" rows="8" cols="60" required>{{ form_data.body or '' }}</textarea>
+      </label>
+    </p>
+    <p>
+      <label>Вложения (необязательно):<br />
+        <input type="file" name="attachments" multiple />
+      </label>
+    </p>
+    <p>
+      <button type="submit">Отправить обращение</button>
+    </p>
+  </form>
+{% endblock %}

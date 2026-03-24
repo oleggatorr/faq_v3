@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block title %}Найти обращение{% endblock %}
+
+{% block content %}
+  <h1>Найти обращение</h1>
+  <p>Введите трек-номер обращения (формат <code>XXX-XXX-XXXX</code>).</p>
+  {% if error %}
+    <p style="color: red;">{{ error }}</p>
+  {% endif %}
+  <form method="post" action="/get-ticket">
+    <p>
+      <label>Трек-номер: <input type="text" name="track_id" required maxlength="20" /></label>
+    </p>
+    <p>
+      <button type="submit">Открыть</button>
+    </p>
+  </form>
+{% endblock %}

@@ -1,9 +1,62 @@
 {% extends "base.html" %}
 
-{% block title %}Тикет {{ ticket_id }}{% endblock %}
+{% block title %}{% if ticket %}Тикет {{ ticket.track_id }}{% else %}Тикет не найден{% endif %}{% endblock %}
 
 {% block content %}
-  <h1>Тикет #{{ ticket_id }}</h1>
-  <p>Страница-заглушка: позже сюда подключим получение тикета, сообщений и событий.</p>
+  {% if error %}
+    <p class="error">{{ error }}</p>
+  {% elif ticket %}
+    <h1>Тикет #{{ ticket.id }} ({{ ticket.track_id }})</h1>
+    <p><strong>Тема:</strong> {{ ticket.subject }}</p>
+    <p><strong>Заявитель:</strong> {{ ticket.customer_name }} &lt;{{ ticket.customer_email }}&gt;</p>
+    <p><strong>Статус ID:</strong> {{ ticket.status_id }} | <strong>Приоритет:</strong> {{ ticket.priority }}</p>
+    <p><strong>Департамент:</strong> {{ ticket.department_id }} | <strong>Категория:</strong> {{ ticket.category_id or '—' }}</p>
+    <hr>
+
+    <h2>Сообщения</h2>
+    <form method="post" action="/tickets/{{ ticket.id }}/reply" enctype="multipart/form-data">
+      <p>
+        <label>Ответ:<br /><textarea name="body" rows="4" cols="60" required></textarea></label>
+      </p>
+      <p>
+        <label>Вложения: <input type="file" name="attachments" multiple /></label>
+      </p>
+      <button type="submit">Отправить ответ</button>
+    </form>
+    <hr />
+    {% if messages %}
+      {% for msg in messages %}
+        <div class="message{% if msg.is_internal %} internal{% endif %}">
+          <p><small>{{ msg.created_at }} | {{ 'Внутренняя заметка' if msg.is_internal else 'Сообщение' }}</small></p>
+          <p>{{ msg.body }}</p>
+          {% set msg_attachments = attachments_by_message.get(msg.id, []) %}
+          {% if msg_attachments %}
+            <ul>
+              {% for att in msg_attachments %}
+                <li>
+                  <a href="/attachments/{{ att.id }}/download">{{ att.original_filename }}</a>
+                  ({{ att.file_size }} bytes)
+                </li>
+              {% endfor %}
+            </ul>
+          {% endif %}
+        </div>
+      {% endfor %}
+    {% else %}
+      <p>Сообщений нет.</p>
+    {% endif %}
+
+    <hr>
+    <h2>История событий</h2>
+    {% if events %}
+      <ul>
+        {% for ev in events %}
+          <li>{{ ev.occurred_at }} | {{ ev.action_type }} | {{ ev.comment or '—' }}</li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p>Событий нет.</p>
+    {% endif %}
+  {% endif %}
 {% endblock %}
 

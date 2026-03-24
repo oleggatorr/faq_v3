@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+
+{% block title %}Аккаунт{% endblock %}
+
+{% block content %}
+  <h1>Аккаунт</h1>
+  <p>Заглушка страницы настроек аккаунта.</p>
+  <ul>
+    <li><strong>Имя:</strong> {{ agent.full_name }}</li>
+    <li><strong>Email:</strong> {{ agent.email }}</li>
+    <li><strong>Роль:</strong> {{ agent.role }}</li>
+  </ul>
+{% endblock %}

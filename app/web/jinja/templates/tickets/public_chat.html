@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}Чат по обращению {{ ticket.track_id if ticket else '' }}{% endblock %}
+
+{% block content %}
+  {% if error %}
+    <p style="color: red;">{{ error }}</p>
+  {% elif ticket %}
+    <h1>Обращение {{ ticket.track_id }}</h1>
+    <p><strong>Тема:</strong> {{ ticket.subject }}</p>
+
+    <hr />
+    <h2>Написать сообщение</h2>
+    <form method="post" action="/ticket/{{ ticket.track_id }}/message" enctype="multipart/form-data">
+      <p>
+        <label>Email (как при создании): <input type="email" name="email" required /></label>
+      </p>
+      <p>
+        <label>Сообщение:<br />
+          <textarea name="body" rows="4" cols="60" required></textarea>
+        </label>
+      </p>
+      <p>
+        <label>Вложения: <input type="file" name="attachments" multiple /></label>
+      </p>
+      <p><button type="submit">Отправить</button></p>
+    </form>
+
+    <hr />
+    <h2>Сообщения</h2>
+    {% if messages %}
+      {% for msg in messages %}
+        <div style="padding: 8px; border: 1px solid #ddd; margin-bottom: 8px;">
+          <p><small>{{ msg.created_at }}</small></p>
+          <p>{{ msg.body }}</p>
+          {% set msg_attachments = attachments_by_message.get(msg.id, []) %}
+          {% if msg_attachments %}
+            <ul>
+              {% for att in msg_attachments %}
+                <li>{{ att.original_filename }} ({{ att.file_size }} bytes)</li>
+              {% endfor %}
+            </ul>
+          {% endif %}
+        </div>
+      {% endfor %}
+    {% else %}
+      <p>Пока сообщений нет.</p>
+    {% endif %}
+  {% endif %}
+{% endblock %}

@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+
+{% block title %}Обращение создано{% endblock %}
+
+{% block content %}
+  <h1>Обращение успешно создано</h1>
+  <p>Сохраните номер обращения для отслеживания статуса:</p>
+  <p style="font-size: 1.5em; font-weight: bold; padding: 1em; background: #e8f4e8; border-radius: 4px;">
+    {{ track_id }}
+  </p>
+  <p><a href="/new-ticket">Создать ещё одно обращение</a> | <a href="/">На главную</a></p>
+{% endblock %}

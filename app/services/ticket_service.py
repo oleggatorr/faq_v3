@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import random
+import string
 from datetime import datetime, timezone
 from typing import Any, Optional
 
@@ -40,6 +42,22 @@ class TicketService:
             .filter(Ticket.track_id == track_id)
             .one_or_none()
         )
+
+    def generate_track_id(self, max_attempts: int = 10) -> str:
+        """
+        Генерирует уникальный track_id. Формат: XXX-XXX-XXXX
+        (заглавная латиница или цифра).
+        """
+        chars = string.ascii_uppercase + string.digits
+
+        def _rand_part(n: int) -> str:
+            return "".join(random.choices(chars, k=n))
+
+        for _ in range(max_attempts):
+            track_id = f"{_rand_part(3)}-{_rand_part(3)}-{_rand_part(4)}"
+            if self._get_by_track_id(track_id) is None:
+                return track_id
+        raise Conflict("Не удалось сгенерировать уникальный track_id")
 
     def create_ticket_with_first_message(
         self,
@@ -487,6 +505,19 @@ class TicketService:
             self.session.commit()
         else:
             self.session.flush()
+
+        try:
+            from app.services.email_service import notify_status_changed
+            notify_status_changed(
+                to_email=ticket.customer_email,
+                track_id=ticket.track_id,
+                subject=ticket.subject,
+                new_status=new_status.name,
+                customer_name=ticket.customer_name,
+            )
+        except Exception:
+            pass
+
         return ticket
 
     def assign_owner(

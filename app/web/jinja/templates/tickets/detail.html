@@ -158,12 +158,26 @@
             <strong>Вложения:</strong>
             <ul>
               {% for att in msg_attachments %}
-                <li>
-                  <a href="/attachments/{{ att.id }}/download" target="_blank">
-                    {{ att.original_filename }}
-                  </a>
-                  <small>({{ (att.file_size / 1024)|round(1) }} KB)</small>
-                </li>
+                {% if att.mime_type.startswith('image/') or att.mime_type == 'application/pdf' %}
+                  <li>
+                    <a href="/attachments/{{ att.id }}/download" target="_blank">
+                      {% if att.mime_type.startswith('image/') %}
+                        🖼️
+                      {% else %}
+                        📄
+                      {% endif %}
+                      {{ att.original_filename }}
+                    </a>
+                    <small>({{ (att.file_size / 1024)|round(1) }} KB)</small>
+                  </li>
+                {% else %}
+                  <li>
+                    <a href="/attachments/{{ att.id }}/download" download>
+                      📎 {{ att.original_filename }}
+                    </a>
+                    <small>({{ (att.file_size / 1024)|round(1) }} KB)</small>
+                  </li>
+                {% endif %}
               {% endfor %}
             </ul>
           </div>

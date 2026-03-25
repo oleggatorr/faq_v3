@@ -57,10 +57,11 @@
     </thead>
     <tbody>
       {% for a in agents %}
-      <tr>
+      <tr class="{% if a.id == agent.id %}table-active{% endif %}">
         <td>{{ a.id }}</td>
         <td>
-          <strong>{{ a.full_name }}</strong><br>
+          <strong>{{ a.full_name }}</strong>
+          {% if a.id == agent.id %} <span class="badge bg-info">Вы</span>{% endif %}<br>
           <small class="text-muted">{{ a.phone or '–' }}</small>
         </td>
         <td><code>{{ a.login }}</code></td>

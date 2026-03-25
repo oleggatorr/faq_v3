@@ -34,7 +34,12 @@
   <!-- Пароль (необязательно) -->
   <div class="mb-3">
     <label class="form-label">Новый пароль <small class="text-muted">(оставьте пустым, чтобы не менять)</small></label>
-    <input type="password" name="password" class="form-control">
+    <input type="password" name="password" id="password" class="form-control">
+  </div>
+
+  <div class="mb-3">
+    <label class="form-label">Подтверждение нового пароля</label>
+    <input type="password" name="password_confirm" id="password_confirm" class="form-control">
   </div>
 
   <!-- Телефон -->
@@ -122,7 +127,35 @@ function toggleFields() {
     permissions.style.display = "block";
   }
 }
+
+// Проверка совпадения паролей
+function validatePasswords() {
+  const password = document.getElementById("password").value;
+  const passwordConfirm = document.getElementById("password_confirm").value;
+  
+  // Если оба поля пустые - ок (пароль не меняется)
+  if (!password && !passwordConfirm) {
+    return true;
+  }
+  
+  // Если заполнено только одно из полей - ошибка
+  if (!password || !passwordConfirm) {
+    alert("Заполните оба поля пароля или оставьте оба пустыми!");
+    return false;
+  }
+  
+  // Проверка совпадения
+  if (password !== passwordConfirm) {
+    alert("Пароли не совпадают!");
+    return false;
+  }
+  return true;
+}
+
 // Инициализация при загрузке
 document.addEventListener('DOMContentLoaded', toggleFields);
+
+// Добавляем проверку при отправке формы
+document.querySelector("form").onsubmit = validatePasswords;
 </script>
 {% endblock %}

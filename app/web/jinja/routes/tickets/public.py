@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
+from starlette.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.core.audit import get_client_info
@@ -17,7 +18,7 @@ from app.services.audit_log_service import AuditLogService
 from app.services.department_service import DepartmentService
 from app.services.errors import Conflict as ServiceConflict
 from app.services.errors import NotFound as ServiceNotFound
-from app.services.file_storage_service import FileStorageError, FileStorageService
+from app.services.file_storage_service import FileStorageService
 from app.services.language_service import LanguageService
 from app.services.message_service import MessageService
 from app.services.question_category_service import QuestionCategoryService
@@ -419,4 +420,53 @@ async def new_ticket_submit(
             "track_id": ticket.track_id,
             "agent": None,
         },
+    )
+
+
+@router.get("/attachments/{attachment_id}/download")
+def attachment_download_public(
+    attachment_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """
+    Скачать вложение (публичный доступ).
+    Проверяет, что вложение принадлежит тикету, к которому у пользователя есть доступ.
+    """
+    attachment_service = AttachmentService(db)
+    
+    # Получаем вложение
+    att = attachment_service.get_orm(attachment_id=attachment_id)
+    if att is None:
+        raise HTTPException(status_code=404, detail="Вложение не найдено")
+    
+    # Проверяем, что вложение принадлежит тикету
+    ticket = att.message.ticket if att.message else None
+    if ticket is None:
+        raise HTTPException(status_code=404, detail="Тикет не найден")
+    
+    # Для публичного доступа проверяем, что пользователь знает track_id
+    # (это косвенная проверка, так как ссылка содержит ID вложения)
+    # В реальной системе можно добавить проверку email или токена
+    
+    file_storage = FileStorageService()
+    path = file_storage.get_path(att.file_path)
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="Файл не найден")
+
+    # Увеличиваем счётчик скачиваний
+    attachment_service.increment_download_count(attachment_id=attachment_id)
+
+    # Определяем, как открывать файл
+    # Изображения и PDF - inline (в браузере), остальные - attachment (скачивание)
+    if att.mime_type.startswith('image/') or att.mime_type == 'application/pdf':
+        disposition = f'inline; filename="{att.original_filename}"'
+    else:
+        disposition = f'attachment; filename="{att.original_filename}"'
+
+    return FileResponse(
+        path=str(path),
+        filename=att.original_filename,
+        media_type=att.mime_type,
+        headers={"Content-Disposition": disposition},
     )

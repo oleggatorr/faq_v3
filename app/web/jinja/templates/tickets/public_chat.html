@@ -28,13 +28,33 @@
     {% if messages %}
       {% for msg in messages %}
         <div style="padding: 8px; border: 1px solid #ddd; margin-bottom: 8px;">
-          <p><small>{{ msg.created_at }}</small></p>
+          <p><small>{{ msg.created_at.strftime('%d.%m.%Y %H:%M') }}</small></p>
           <p>{{ msg.body }}</p>
           {% set msg_attachments = attachments_by_message.get(msg.id, []) %}
           {% if msg_attachments %}
+            <p><strong>Вложения:</strong></p>
             <ul>
               {% for att in msg_attachments %}
-                <li>{{ att.original_filename }} ({{ att.file_size }} bytes)</li>
+                {% if att.mime_type.startswith('image/') or att.mime_type == 'application/pdf' %}
+                  <li>
+                    <a href="/attachments/{{ att.id }}/download" target="_blank">
+                      {% if att.mime_type.startswith('image/') %}
+                        🖼️
+                      {% else %}
+                        📄
+                      {% endif %}
+                      {{ att.original_filename }}
+                    </a>
+                    <small>({{ (att.file_size / 1024)|round(1) }} KB)</small>
+                  </li>
+                {% else %}
+                  <li>
+                    <a href="/attachments/{{ att.id }}/download" download>
+                      📎 {{ att.original_filename }}
+                    </a>
+                    <small>({{ (att.file_size / 1024)|round(1) }} KB)</small>
+                  </li>
+                {% endif %}
               {% endfor %}
             </ul>
           {% endif %}

@@ -12,7 +12,11 @@ from app.core.auth import (
     check_agent_view,
     CurrentAgent,
 )
-from app.core.permissions import Permission, PERMISSION_LABELS
+from app.core.permissions import (
+    DEFAULT_OPERATOR_PERMISSIONS,
+    Permission,
+    PERMISSION_LABELS,
+)
 from app.models import get_db
 from app.models.agent import Agent
 from app.schemas.agent import AgentCreate, AgentUpdate
@@ -103,6 +107,7 @@ def add_agent_submit(
     login: str = Form(...),
     email: str = Form(...),
     password: str = Form(...),
+    password_confirm: str = Form(...),
     role: str = Form(...),
     department_id: int = Form(...),
     category_access: list[str] = Form(default=[]),
@@ -111,17 +116,46 @@ def add_agent_submit(
 ):
     agent_service = AgentService(db)
     
+    # Если права не выбраны вручную, выдаём права по умолчанию для оператора
+    if not permissions and role == "operator":
+        permissions = [p.value for p in DEFAULT_OPERATOR_PERMISSIONS]
+    
+    # Проверка совпадения паролей
+    if password != password_confirm:
+        dept_service = DepartmentService(db)
+        return templates.TemplateResponse(
+            "agents/add.html",
+            {
+                "request": request,
+                "agent": agent,
+                "error": "Пароли не совпадают",
+                "permissions_list": list(Permission),
+                "permission_labels": PERMISSION_LABELS,
+                "form_data": {
+                    "full_name": full_name,
+                    "login": login,
+                    "email": email,
+                    "role": role,
+                    "department_id": department_id,
+                    "phone": phone,
+                    "category_access": category_access,
+                    "permissions": permissions,
+                },
+            },
+            status_code=400,
+        )
+
     # Проверка на дубликаты
     existing_by_email = db.query(Agent).filter(Agent.email == email.strip().lower()).first()
     existing_by_login = db.query(Agent).filter(Agent.login == login.strip()).first()
-    
+
     if existing_by_email:
         error_msg = "Агент с таким email уже существует"
     elif existing_by_login:
         error_msg = "Агент с таким логином уже существует"
     else:
         error_msg = None
-    
+
     if error_msg:
         dept_service = DepartmentService(db)
         return templates.TemplateResponse(
@@ -264,6 +298,7 @@ def edit_agent_submit(
     login: str = Form(...),
     email: str = Form(...),
     password: str = Form(None),
+    password_confirm: str = Form(None),
     role: str = Form(...),
     department_id: int = Form(...),
     category_access: list[str] = Form(default=[]),
@@ -272,6 +307,32 @@ def edit_agent_submit(
     is_active: bool = Form(False),
 ):
     agent_service = AgentService(db)
+    
+    # Если права не выбраны вручную, выдаём права по умолчанию для оператора
+    if not permissions and role == "operator":
+        permissions = [p.value for p in DEFAULT_OPERATOR_PERMISSIONS]
+
+    # Проверка совпадения паролей
+    if password or password_confirm:
+        if password != password_confirm:
+            dept_service = DepartmentService(db)
+            target_agent = agent_service.get(agent_id=agent_id)
+            return templates.TemplateResponse(
+                "agents/edit.html",
+                {
+                    "request": request,
+                    "agent": agent,
+                    "target_agent": target_agent,
+                    "departments": dept_service.list(filters={"is_active": True}, sort_by="name", limit=200),
+                    "error": "Пароли не совпадают",
+                    "permissions_list": list(Permission),
+                    "permission_labels": PERMISSION_LABELS,
+                    "selected_categories": category_access,
+                    "selected_permissions": permissions,
+                    **agent.get_permissions_dict(),
+                },
+                status_code=400,
+            )
 
     try:
         if role == "admin":

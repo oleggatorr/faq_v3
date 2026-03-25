@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
+from starlette.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.core.audit import get_client_info
@@ -10,6 +11,7 @@ from app.core.auth import (
     check_agent_view,
     check_can_del_tickets,
     check_can_edit_tickets,
+    check_can_reply_tickets,
     check_can_view_tickets,
     get_current_agent,
     require_permission,
@@ -185,7 +187,7 @@ def ticket_detail_admin(
 async def admin_reply(
     ticket_id: int,
     request: Request,
-    agent: AgentRead = Depends(check_can_view_tickets),
+    agent: AgentRead = Depends(check_can_reply_tickets),
     db: Session = Depends(get_db),
     body: str = Form(...),
     is_internal: str = Form("false"),
@@ -420,8 +422,16 @@ def attachment_download(
 
     attachment_service.increment_download_count(attachment_id=attachment_id)
 
-    return file_storage.FileResponse(
-        path=path,
+    # Определяем, как открывать файл
+    # Изображения и PDF - inline (в браузере), остальные - attachment (скачивание)
+    if att.mime_type.startswith('image/') or att.mime_type == 'application/pdf':
+        disposition = f'inline; filename="{att.original_filename}"'
+    else:
+        disposition = f'attachment; filename="{att.original_filename}"'
+
+    return FileResponse(
+        path=str(path),
         filename=att.original_filename,
         media_type=att.mime_type,
+        headers={"Content-Disposition": disposition},
     )

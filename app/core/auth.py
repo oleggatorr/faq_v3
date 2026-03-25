@@ -11,10 +11,11 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import Depends, HTTPException, Request
+from fastapi import Depends, Request
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.errors import AccessDeniedError
 from app.core.permissions import Permission
 from app.core.security import verify_password, verify_token
 from app.models import get_db
@@ -125,7 +126,7 @@ def check_can_view_tickets(request: Request, db: Session = Depends(get_db)) -> A
     if agent.role == AgentRole.admin:
         return agent
     if not agent.has_permission(Permission.can_view_tickets):
-        raise HTTPException(status_code=403, detail="Нет права: can_view_tickets")
+        raise AccessDeniedError("Нет прав доступа", required_permission="can_view_tickets")
     return agent
 
 def check_can_submit_any_cat(request: Request, db: Session = Depends(get_db)) -> AgentRead:
@@ -133,7 +134,15 @@ def check_can_submit_any_cat(request: Request, db: Session = Depends(get_db)) ->
     if agent.role == AgentRole.admin:
         return agent
     if not agent.has_permission(Permission.can_submit_any_cat):
-        raise HTTPException(status_code=403, detail="Нет права: can_submit_any_cat")
+        raise AccessDeniedError("Нет прав доступа", required_permission="can_submit_any_cat")
+    return agent
+
+def check_can_reply_tickets(request: Request, db: Session = Depends(get_db)) -> AgentRead:
+    agent = get_current_agent(request, db)
+    if agent.role == AgentRole.admin:
+        return agent
+    if not agent.has_permission(Permission.can_reply_tickets):
+        raise AccessDeniedError("Нет прав доступа", required_permission="can_reply_tickets")
     return agent
 
 def check_can_edit_tickets(request: Request, db: Session = Depends(get_db)) -> AgentRead:
@@ -141,7 +150,7 @@ def check_can_edit_tickets(request: Request, db: Session = Depends(get_db)) -> A
     if agent.role == AgentRole.admin:
         return agent
     if not agent.has_permission(Permission.can_edit_tickets):
-        raise HTTPException(status_code=403, detail="Нет права: can_edit_tickets")
+        raise AccessDeniedError("Нет прав доступа", required_permission="can_edit_tickets")
     return agent
 
 def check_can_del_tickets(request: Request, db: Session = Depends(get_db)) -> AgentRead:
@@ -149,7 +158,7 @@ def check_can_del_tickets(request: Request, db: Session = Depends(get_db)) -> Ag
     if agent.role == AgentRole.admin:
         return agent
     if not agent.has_permission(Permission.can_del_tickets):
-        raise HTTPException(status_code=403, detail="Нет права: can_del_tickets")
+        raise AccessDeniedError("Нет прав доступа", required_permission="can_del_tickets")
     return agent
 
 def check_agent_view(request: Request, db: Session = Depends(get_db)) -> AgentRead:
@@ -157,7 +166,7 @@ def check_agent_view(request: Request, db: Session = Depends(get_db)) -> AgentRe
     if agent.role == AgentRole.admin:
         return agent
     if not agent.has_permission(Permission.agent_view):
-        raise HTTPException(status_code=403, detail="Нет права: agent_view")
+        raise AccessDeniedError("Нет прав доступа", required_permission="agent_view")
     return agent
 
 def check_agent_create(request: Request, db: Session = Depends(get_db)) -> AgentRead:
@@ -165,7 +174,7 @@ def check_agent_create(request: Request, db: Session = Depends(get_db)) -> Agent
     if agent.role == AgentRole.admin:
         return agent
     if not agent.has_permission(Permission.agent_create):
-        raise HTTPException(status_code=403, detail="Нет права: agent_create")
+        raise AccessDeniedError("Нет прав доступа", required_permission="agent_create")
     return agent
 
 def check_agent_edit(request: Request, db: Session = Depends(get_db)) -> AgentRead:
@@ -173,7 +182,7 @@ def check_agent_edit(request: Request, db: Session = Depends(get_db)) -> AgentRe
     if agent.role == AgentRole.admin:
         return agent
     if not agent.has_permission(Permission.agent_edit):
-        raise HTTPException(status_code=403, detail="Нет права: agent_edit")
+        raise AccessDeniedError("Нет прав доступа", required_permission="agent_edit")
     return agent
 
 def check_agent_delete(request: Request, db: Session = Depends(get_db)) -> AgentRead:
@@ -181,7 +190,7 @@ def check_agent_delete(request: Request, db: Session = Depends(get_db)) -> Agent
     if agent.role == AgentRole.admin:
         return agent
     if not agent.has_permission(Permission.agent_delete):
-        raise HTTPException(status_code=403, detail="Нет права: agent_delete")
+        raise AccessDeniedError("Нет прав доступа", required_permission="agent_delete")
     return agent
 
 def check_audit_logs_view(request: Request, db: Session = Depends(get_db)) -> AgentRead:
@@ -189,7 +198,7 @@ def check_audit_logs_view(request: Request, db: Session = Depends(get_db)) -> Ag
     if agent.role == AgentRole.admin:
         return agent
     if not agent.has_permission(Permission.audit_logs_view):
-        raise HTTPException(status_code=403, detail="Нет права: audit_logs_view")
+        raise AccessDeniedError("Нет прав доступа", required_permission="audit_logs_view")
     return agent
 
 

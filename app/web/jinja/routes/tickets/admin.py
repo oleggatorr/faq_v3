@@ -1,0 +1,427 @@
+from __future__ import annotations
+
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
+from fastapi.responses import HTMLResponse, RedirectResponse
+from sqlalchemy.orm import Session
+
+from app.core.audit import get_client_info
+from app.core.auth import (
+    CurrentAgent,
+    check_agent_view,
+    check_can_del_tickets,
+    check_can_edit_tickets,
+    check_can_view_tickets,
+    get_current_agent,
+    require_permission,
+)
+from app.models import get_db
+from app.models.agent import Agent
+from app.models.ticket import Priority
+from app.models.ticket_event import TicketEvent
+from app.schemas.agent import AgentRead
+from app.schemas.message import MessageCreate
+from app.schemas.ticket import TicketUpdate
+from app.services.agent_service import AgentService
+from app.services.attachment_service import AttachmentService
+from app.services.audit_log_service import AuditLogService
+from app.services.question_category_service import QuestionCategoryService
+from app.services.errors import NotFound
+from app.services.file_storage_service import FileStorageError, FileStorageService
+from app.services.message_service import MessageService
+from app.services.ticket_event_service import TicketEventService
+from app.services.ticket_service import TicketService
+from app.services.ticket_status_service import TicketStatusService
+
+from ..main import templates
+from ..utils import _ticket_filters
+
+router = APIRouter(prefix="", tags=["tickets-admin"])
+
+
+@router.get("/tickets", response_class=HTMLResponse)
+def tickets_list(
+    request: Request,
+    agent: AgentRead = Depends(check_can_view_tickets),
+    db: Session = Depends(get_db),
+    q: str = Query("", description="Quick search by track_id/subject/customer"),
+    sort_by: str = Query("id", description="Sort field"),
+    sort_desc: bool = Query(False, description="Sort descending"),
+    limit: int = Query(50, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    archived: str = Query("active", description="Filter by archived: active, archived, all"),
+):
+    ticket_service = TicketService(db)
+    category_service = QuestionCategoryService(db)
+    status_service = TicketStatusService(db)
+    filters = _ticket_filters(request)
+    if q and not any(filters.get(k) for k in ("track_id", "subject", "customer_name", "customer_email")):
+        filters["track_id"] = q.strip()
+
+    # Фильтр по архиву
+    if archived == "active":
+        filters["is_archived"] = False
+    elif archived == "archived":
+        filters["is_archived"] = True
+    # если archived == "all" — не добавляем фильтр
+
+    tickets = ticket_service.list(
+        filters=filters if filters else None,
+        sort_by=sort_by,
+        sort_desc=sort_desc,
+        limit=limit,
+        offset=offset,
+    )
+    categories = category_service.list(limit=500)
+    statuses = status_service.list(limit=200)
+    category_name_by_id = {c.id: c.name for c in categories}
+    status_name_by_id = {s.id: s.name for s in statuses}
+
+    return templates.TemplateResponse(
+        "tickets/list.html",
+        {
+            "request": request,
+            "tickets": tickets,
+            "agent": agent,
+            "categories": categories,
+            "statuses": statuses,
+            "category_name_by_id": category_name_by_id,
+            "status_name_by_id": status_name_by_id,
+            "filters": filters,
+            "q": q,
+            "sort_by": sort_by,
+            "sort_desc": sort_desc,
+            "limit": limit,
+            "offset": offset,
+            "archived_filter": archived,
+            **agent.get_permissions_dict(),
+        },
+    )
+
+
+@router.get("/list-tickets", response_class=RedirectResponse)
+def list_tickets_alias(agent: CurrentAgent):
+    return RedirectResponse(url="/tickets", status_code=303)
+
+
+@router.get("/tickets/{ticket_id}", response_class=HTMLResponse)
+def ticket_detail_admin(
+    request: Request,
+    ticket_id: int,
+    agent: AgentRead = Depends(check_can_view_tickets),
+    db: Session = Depends(get_db),
+):
+    ticket_service = TicketService(db)
+    try:
+        ticket = ticket_service.get(ticket_id=ticket_id)
+    except NotFound:
+        return templates.TemplateResponse(
+            "tickets/detail.html",
+            {"request": request, "ticket": None, "error": "Тикет не найден", "agent": agent},
+            status_code=404,
+        )
+
+    message_service = MessageService(db)
+    messages = message_service.list(
+        filters={"ticket_id": ticket.id},
+        sort_by="created_at",
+        sort_desc=False,
+        limit=500,
+    )
+
+    attachment_service = AttachmentService(db)
+    attachments_by_message: dict[int, list] = {}
+    for msg in messages:
+        attachments_by_message[msg.id] = attachment_service.list(
+            filters={"message_id": msg.id},
+            sort_by="id",
+            limit=50,
+        )
+
+    events = (
+        db.query(TicketEvent)
+        .filter(TicketEvent.ticket_id == ticket.id)
+        .order_by(TicketEvent.occurred_at.asc())
+        .limit(200)
+        .all()
+    )
+
+    status_service = TicketStatusService(db)
+    category_service = QuestionCategoryService(db)
+    agent_service = AgentService(db)
+
+    statuses = status_service.list(sort_by="sort_order", limit=200)
+    categories = category_service.list(filters={"is_active": True}, sort_by="sort_order", limit=200)
+    agents = agent_service.list(filters={"is_active": True}, sort_by="full_name", limit=500)
+
+    priorities = list(Priority)
+
+    status_name_by_id = {s.id: s.name for s in statuses}
+    category_name_by_id = {c.id: c.name for c in categories}
+    agent_name_by_id = {a.id: a.full_name for a in agents}
+
+    return templates.TemplateResponse(
+        "tickets/detail.html",
+        {
+            "request": request,
+            "ticket": ticket,
+            "messages": messages,
+            "events": events,
+            "attachments_by_message": attachments_by_message,
+            "agent": agent,
+            "statuses": statuses,
+            "priorities": priorities,
+            "categories": categories,
+            "agents": agents,
+            "status_name_by_id": status_name_by_id,
+            "category_name_by_id": category_name_by_id,
+            "agent_name_by_id": agent_name_by_id,
+            "error": None,
+            **agent.get_permissions_dict(),
+        },
+    )
+
+
+@router.post("/tickets/{ticket_id}/reply", response_class=RedirectResponse)
+async def admin_reply(
+    ticket_id: int,
+    request: Request,
+    agent: AgentRead = Depends(check_can_view_tickets),
+    db: Session = Depends(get_db),
+    body: str = Form(...),
+    is_internal: str = Form("false"),
+    attachments: list[UploadFile] = File(default=[]),
+):
+    is_internal_bool = is_internal.lower() in ("true", "on", "1", "yes")
+
+    ticket_service = TicketService(db, ticket_event_service=TicketEventService(db))
+    try:
+        ticket = ticket_service.get(ticket_id=ticket_id)
+    except NotFound:
+        raise HTTPException(status_code=404, detail="Тикет не найден")
+
+    message_service = MessageService(db, ticket_event_service=TicketEventService(db))
+
+    message_data = MessageCreate(
+        ticket_id=ticket.id,
+        agent_id=agent.id,
+        customer_name=None,
+        customer_email=None,
+        subject=ticket.subject,
+        body=body.strip(),
+        is_internal=is_internal_bool,
+        is_automatic=False,
+        ip_address=(request.client.host if request.client else None),
+    )
+    message = message_service.add_message(message_data=message_data, agent_id=agent.id)
+    
+    # Логируем создание сообщения
+    client_info = get_client_info(request)
+    log_service = AuditLogService(db)
+    log_service.log_action(
+        action="create",
+        entity_type="message",
+        entity_id=message.id,
+        agent_id=agent.id,
+        details={
+            "ticket_id": ticket.id,
+            "is_internal": is_internal_bool,
+            "has_attachments": bool(attachments),
+        },
+        **client_info,
+    )
+
+    if attachments:
+        file_storage = FileStorageService()
+        attachment_service = AttachmentService(db, ticket_event_service=TicketEventService(db))
+        files_meta = []
+        for uf in attachments:
+            if not uf.filename or not uf.filename.strip():
+                continue
+            content = await uf.read()
+            if not content:
+                continue
+            try:
+                meta = file_storage.save(
+                    content=content,
+                    original_filename=uf.filename,
+                    mime_type=uf.content_type or "application/octet-stream",
+                )
+                files_meta.append(meta)
+            except FileStorageError:
+                continue
+        if files_meta:
+            attachment_service.add_attachments(
+                message=message,
+                uploaded_by_agent_id=agent.id,
+                files=files_meta,
+            )
+
+    if not is_internal_bool and ticket.customer_email:
+        try:
+            from app.services.email_service import notify_new_message
+            notify_new_message(
+                to_email=ticket.customer_email,
+                track_id=ticket.track_id,
+                subject=ticket.subject,
+                message_preview=body.strip()[:200],
+                from_name=agent.full_name or "Поддержка",
+            )
+        except Exception:
+            pass
+
+    return RedirectResponse(url=f"/tickets/{ticket_id}", status_code=303)
+
+
+@router.post("/tickets/{ticket_id}/update", response_class=RedirectResponse)
+def admin_update_ticket(
+    ticket_id: int,
+    request: Request,
+    agent: AgentRead = Depends(check_can_edit_tickets),
+    db: Session = Depends(get_db),
+    status_id: str = Form(""),
+    priority: str = Form(""),
+    owner_id: str = Form(""),
+    category_id: str = Form(""),
+    is_locked: str = Form("false"),
+    is_archived: str = Form("false"),
+):
+    ticket_service = TicketService(db, ticket_event_service=TicketEventService(db))
+    update_data = {}
+
+    if status_id and status_id.isdigit():
+        update_data["status_id"] = int(status_id)
+
+    if priority:
+        try:
+            update_data["priority"] = Priority(priority)
+        except ValueError:
+            pass
+
+    if owner_id and owner_id.isdigit():
+        owner_val = int(owner_id)
+        update_data["owner_id"] = owner_val if owner_val > 0 else None
+
+    if category_id and category_id.isdigit():
+        cat_val = int(category_id)
+        update_data["category_id"] = cat_val if cat_val > 0 else None
+
+    update_data["is_locked"] = is_locked.lower() in ("true", "on", "1", "yes")
+    update_data["is_archived"] = is_archived.lower() in ("true", "on", "1", "yes")
+
+    clean_update = {k: v for k, v in update_data.items() if v is not None}
+
+    if clean_update:
+        try:
+            ticket_service.update_ticket(
+                ticket_id=ticket_id,
+                ticket_data=TicketUpdate(**clean_update),
+                agent_id=agent.id,
+            )
+            
+            # Логируем изменение тикета
+            client_info = get_client_info(request)
+            log_service = AuditLogService(db)
+            log_service.log_action(
+                action="update",
+                entity_type="ticket",
+                entity_id=ticket_id,
+                agent_id=agent.id,
+                details={"changes": clean_update},
+                **client_info,
+            )
+        except NotFound:
+            raise HTTPException(status_code=404, detail="Тикет не найден")
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Ошибка обновления: {str(e)}")
+
+    return RedirectResponse(url=f"/tickets/{ticket_id}", status_code=303)
+
+
+@router.post("/tickets/{ticket_id}/delete")
+async def delete_ticket(
+    request: Request,
+    ticket_id: int,
+    db: Session = Depends(get_db),
+    agent: AgentRead = Depends(check_can_del_tickets),
+):
+    ticket_service = TicketService(db)
+    result = ticket_service.delete_ticket(
+        ticket_id=ticket_id,
+        agent_id=agent.id,
+    )
+
+    if not result.success:
+        raise HTTPException(status_code=404, detail=result.detail or "Тикет не найден")
+    
+    # Логируем удаление тикета
+    client_info = get_client_info(request)
+    log_service = AuditLogService(db)
+    log_service.log_action(
+        action="delete",
+        entity_type="ticket",
+        entity_id=ticket_id,
+        agent_id=agent.id,
+        details={"deleted_by": agent.full_name},
+        **client_info,
+    )
+
+    return RedirectResponse(url="/tickets", status_code=303)
+
+
+@router.post("/tickets/{ticket_id}/restore", response_class=RedirectResponse)
+def restore_ticket(
+    ticket_id: int,
+    request: Request,
+    agent: AgentRead = Depends(check_can_edit_tickets),
+    db: Session = Depends(get_db),
+):
+    """Восстановить тикет из архива (снять флаг is_archived)."""
+    ticket_service = TicketService(db, ticket_event_service=TicketEventService(db))
+    try:
+        ticket_service.update_ticket(
+            ticket_id=ticket_id,
+            ticket_data=TicketUpdate(is_archived=False),
+            agent_id=agent.id,
+        )
+        
+        # Логируем восстановление тикета
+        client_info = get_client_info(request)
+        log_service = AuditLogService(db)
+        log_service.log_action(
+            action="update",
+            entity_type="ticket",
+            entity_id=ticket_id,
+            agent_id=agent.id,
+            details={"restored_from_archive": True},
+            **client_info,
+        )
+    except NotFound:
+        raise HTTPException(status_code=404, detail="Тикет не найден")
+
+    return RedirectResponse(url=f"/tickets/{ticket_id}", status_code=303)
+
+
+@router.get("/attachments/{attachment_id}/download")
+def attachment_download(
+    attachment_id: int,
+    agent: CurrentAgent,
+    db: Session = Depends(get_db),
+):
+    """Скачать вложение (для авторизованных операторов)."""
+    attachment_service = AttachmentService(db)
+    att = attachment_service.get_orm(attachment_id=attachment_id)
+    if att is None:
+        raise HTTPException(status_code=404, detail="Вложение не найдено")
+
+    file_storage = FileStorageService()
+    path = file_storage.get_path(att.file_path)
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="Файл не найден")
+
+    attachment_service.increment_download_count(attachment_id=attachment_id)
+
+    return file_storage.FileResponse(
+        path=path,
+        filename=att.original_filename,
+        media_type=att.mime_type,
+    )

@@ -35,6 +35,17 @@ class Permission(str, Enum):
     can_privacy = "can_privacy"
     can_service_msg = "can_service_msg"
     can_email_tpl = "can_email_tpl"
+    # Права для работы с агентами
+    agent_view = "agent_view"
+    agent_create = "agent_create"
+    agent_edit = "agent_edit"
+    agent_delete = "agent_delete"
+    # Права для просмотра логов
+    audit_logs_view = "audit_logs_view"
+
+
+# 📋 Список всех прав (для генерации dict)
+ALL_PERMISSIONS = list(Permission)
 
 
 # 📘 Человекочитаемые названия
@@ -72,6 +83,11 @@ PERMISSION_LABELS = {
     Permission.can_privacy: "Управление приватностью",
     Permission.can_service_msg: "Системные сообщения",
     Permission.can_email_tpl: "Управление email-шаблонами",
+    Permission.agent_view: "Просмотр агентов",
+    Permission.agent_create: "Создание агентов",
+    Permission.agent_edit: "Редактирование агентов",
+    Permission.agent_delete: "Удаление агентов",
+    Permission.audit_logs_view: "Просмотр логов аудита",
 }
 
 
@@ -124,7 +140,35 @@ PERMISSION_GROUPS = {
         Permission.can_service_msg,
         Permission.can_email_tpl,
     ],
+    "Агенты": [
+        Permission.agent_view,
+        Permission.agent_create,
+        Permission.agent_edit,
+        Permission.agent_delete,
+    ],
+    "Аудит": [
+        Permission.audit_logs_view,
+    ],
 }
+
+
+# 📦 Наборы прав по умолчанию
+DEFAULT_OPERATOR_PERMISSIONS = [
+    Permission.can_view_tickets,
+    Permission.can_reply_tickets,
+    Permission.can_edit_tickets,
+    Permission.can_resolve,
+    Permission.can_assign_self,
+    Permission.can_view_ass_others,
+    Permission.agent_view,
+]
+
+
+DEFAULT_READONLY_PERMISSIONS = [
+    Permission.can_view_tickets,
+    Permission.can_view_ass_others,
+    Permission.agent_view,
+]
 
 
 # 🔐 Проверка прав

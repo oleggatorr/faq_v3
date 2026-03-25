@@ -23,6 +23,13 @@
           {% endfor %}
         </select>
       </label>
+      <label>Архив:
+        <select name="archived">
+          <option value="active" {% if archived_filter == "active" %}selected{% endif %}>Неархивированные</option>
+          <option value="archived" {% if archived_filter == "archived" %}selected{% endif %}>Архивные</option>
+          <option value="all" {% if archived_filter == "all" %}selected{% endif %}>Все</option>
+        </select>
+      </label>
     </p>
     <p>
       <label>Сортировка:

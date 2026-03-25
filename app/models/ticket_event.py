@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, BigInteger, Enum as SQLEnum
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, BigInteger
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 import enum
@@ -19,6 +19,7 @@ class EventType(str, enum.Enum):
     unlocked = "unlocked"
     anonymized = "anonymized"
     archived = "archived"
+    unarchived = "unarchived"
     note_added = "note_added"
     attachment_added = "attachment_added"
     customer_replied = "customer_replied"
@@ -29,13 +30,13 @@ class TicketEvent(Base):
     id = Column(BigInteger, primary_key=True, autoincrement=True)
     ticket_id = Column(Integer, ForeignKey("tickets.id", ondelete="CASCADE"), nullable=False, index=True)
     agent_id = Column(Integer, ForeignKey("agents.id", ondelete="SET NULL", onupdate="CASCADE"), nullable=True, index=True)
-    
-    action_type = Column(SQLEnum(EventType), nullable=False, index=True)
+
+    action_type = Column(String(50), nullable=False, index=True)  # Было: SQLEnum(EventType)
     field_name = Column(String(100), nullable=True)
     old_value = Column(Text, nullable=True)
     new_value = Column(Text, nullable=True)
     comment = Column(Text, nullable=True)
-    
+
     occurred_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
 
     ticket = relationship("Ticket", back_populates="events")

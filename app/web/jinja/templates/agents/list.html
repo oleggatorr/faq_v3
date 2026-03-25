@@ -5,7 +5,9 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
   <h1>Операторы</h1>
+  {% if can_agent_create %}
   <a href="/agents/add" class="btn btn-primary">+ Добавить</a>
+  {% endif %}
 </div>
 
 {% if error %}
@@ -44,6 +46,7 @@
           <a href="?sort_by=id&sort_desc={% if sort_by == 'id' and not sort_desc %}true{% else %}false{% endif %}">ID</a>
         </th>
         <th>ФИО</th>
+        <th>Логин</th>
         <th>Email</th>
         <th>Роль</th>
         <th>Департамент</th>
@@ -60,6 +63,7 @@
           <strong>{{ a.full_name }}</strong><br>
           <small class="text-muted">{{ a.phone or '–' }}</small>
         </td>
+        <td><code>{{ a.login }}</code></td>
         <td><a href="mailto:{{ a.email }}">{{ a.email }}</a></td>
         <td>
           <span class="badge {% if a.role == 'admin' %}bg-danger{% else %}bg-success{% endif %}">
@@ -82,11 +86,15 @@
           {% endif %}
         </td>
         <td class="text-end">
+          {% if can_agent_edit %}
           <a href="/agents/{{ a.id }}/edit" class="btn btn-sm btn-outline-primary">✏️</a>
-          <form method="post" action="/agents/{{ a.id }}/delete" class="d-inline" 
+          {% endif %}
+          {% if can_agent_delete %}
+          <form method="post" action="/agents/{{ a.id }}/delete" class="d-inline"
                 onsubmit="return confirm('Удалить оператора {{ a.full_name }}?');">
             <button type="submit" class="btn btn-sm btn-outline-danger">🗑️</button>
           </form>
+          {% endif %}
         </td>
       </tr>
       {% endfor %}

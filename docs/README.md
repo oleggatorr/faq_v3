@@ -11,6 +11,9 @@
 - [Модели данных](./04-data-models/index.md)
 - [API-схемы](./05-schemas/index.md)
 - [Сервисы](./06-services/index.md)
+- [Аутентификация и права](./07-auth/permissions.md)
+- [Карта роутов](./09-route-map/index.md)
+- [Аудиторское логирование](./10-audit-logs/README.md)
 
 ## Что важно в текущей версии
 
@@ -20,6 +23,9 @@
 - Для оператора задаются:
   - доступ к категориям (`category_access`)
   - набор действий/прав (`permissions`)
+- **Система событий тикетов** — все изменения тикета логируются в `ticket_events`
+- **Аудиторское логирование** — система реализована (см. `10-audit-logs/README.md`)
+- **Система прав доступа** — гибкое управление правами (см. `07-auth/permissions.md`)
 
 ## Карта документации
 
@@ -28,18 +34,21 @@
 - `04-data-models/agent.md` - детальное описание модели агента.
 - `05-schemas/index.md` - перечень всех Pydantic-схем API.
 - `06-services/index.md` - план и контракты сервисного слоя.
+- `07-auth/permissions.md` - **система прав доступа (permissions)**
+- `09-route-map/index.md` - **полная карта всех маршрутов**
+- `10-audit-logs/README.md` - система логирования (текущая и планируемая)
 
 ## Веб-интерфейсы, роуты и запуск
 
 Проект сейчас поддерживает два набора роутов:
 
-- Jinja2 frontend (рендер HTML): `app/web/jinja/routes.py`
+- Jinja2 frontend (рендер HTML): `app/web/jinja/routes/`
   - `GET /` — главная
-  - `GET /tickets` — список тикетов (пока заглушка)
-  - `GET /tickets/{ticket_id}` — детальная страница (пока заглушка)
-  - `GET /agents` — список операторов (пока заглушка)
-  - `GET /departments` — список департаментов (пока заглушка)
-  - `GET /lookups/languages` — список языков (пока заглушка)
+  - `GET /tickets` — список тикетов с фильтрами (archived, status, category)
+  - `GET /tickets/{ticket_id}` — детальная страница тикета
+  - `GET /agents` — список операторов
+  - `GET /departments` — список департаментов
+  - `GET /lookups/languages` — список языков
 - API router (структура + health endpoint): `app/web/api/routes.py`
   - `GET /api/health` — проверка доступности
 

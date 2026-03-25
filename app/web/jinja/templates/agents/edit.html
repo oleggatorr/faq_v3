@@ -13,14 +13,21 @@
   <!-- ФИО -->
   <div class="mb-3">
     <label class="form-label">ФИО *</label>
-    <input type="text" name="full_name" class="form-control" 
+    <input type="text" name="full_name" class="form-control"
            value="{{ target_agent.full_name }}" required>
+  </div>
+
+  <!-- Логин -->
+  <div class="mb-3">
+    <label class="form-label">Логин *</label>
+    <input type="text" name="login" class="form-control"
+           value="{{ target_agent.login }}" required>
   </div>
 
   <!-- Email -->
   <div class="mb-3">
     <label class="form-label">Email *</label>
-    <input type="email" name="email" class="form-control" 
+    <input type="email" name="email" class="form-control"
            value="{{ target_agent.email }}" required>
   </div>
 

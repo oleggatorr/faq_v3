@@ -355,18 +355,23 @@ class TicketService:
                 )
             ticket.merged_into_id = new_merged_into_id
 
-        # Archive: log if transitioning to archived.
+        # Archive: log if transitioning to archived or unarchived.
         if "is_archived" in updates:
             new_is_archived = updates.pop("is_archived")
             if (
-                new_is_archived is True
-                and ticket.is_archived != new_is_archived
+                ticket.is_archived != new_is_archived
                 and self.ticket_event_service is not None
             ):
+                # Определяем тип события в зависимости от направления изменения
+                if new_is_archived:
+                    action_type = EventType.archived
+                else:
+                    action_type = EventType.unarchived
+                
                 self.ticket_event_service.add_event(
                     ticket_id=ticket.id,
                     agent_id=agent_id,
-                    action_type=EventType.archived,
+                    action_type=action_type,
                     field_name="is_archived",
                     old_value=str(old_is_archived),
                     new_value=str(new_is_archived),

@@ -15,8 +15,9 @@
           <a href="/tickets">Тикеты</a> |
           <a href="/agents">Операторы</a> |
           <a href="/departments">Департаменты</a> |
-          <a href="/question-category-list">Категории</a> |
-          <a href="/accaunt">Аккаунт</a>
+          <a href="/question-category-list">Категории</a>
+          {% if agent.role == 'admin' %} | <a href="/logs">Логи</a>{% endif %}
+          | <a href="/accaunt">Аккаунт</a>
           | {{ agent.full_name }} |
           <form method="post" action="/logout" style="display:inline;"><button type="submit">Выход</button></form>
         {% else %}

@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+
+{% block title %}Аудиторские логи{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h1>Аудиторские логи</h1>
+</div>
+
+<!-- Фильтры -->
+<form method="get" class="row g-3 mb-4">
+  <div class="col-md-3">
+    <label class="form-label">Действие</label>
+    <select name="action" class="form-select">
+      <option value="">Все действия</option>
+      <option value="login" {% if action_filter == 'login' %}selected{% endif %}>Вход</option>
+      <option value="login_failed" {% if action_filter == 'login_failed' %}selected{% endif %}>Неудачный вход</option>
+      <option value="logout" {% if action_filter == 'logout' %}selected{% endif %}>Выход</option>
+      <option value="create" {% if action_filter == 'create' %}selected{% endif %}>Создание</option>
+      <option value="update" {% if action_filter == 'update' %}selected{% endif %}>Изменение</option>
+      <option value="delete" {% if action_filter == 'delete' %}selected{% endif %}>Удаление</option>
+    </select>
+  </div>
+  
+  <div class="col-md-3">
+    <label class="form-label">Тип объекта</label>
+    <select name="entity_type" class="form-select">
+      <option value="">Все типы</option>
+      <option value="agent" {% if entity_type_filter == 'agent' %}selected{% endif %}>Агент</option>
+      <option value="ticket" {% if entity_type_filter == 'ticket' %}selected{% endif %}>Заявка</option>
+      <option value="department" {% if entity_type_filter == 'department' %}selected{% endif %}>Департамент</option>
+    </select>
+  </div>
+  
+  <div class="col-md-3">
+    <label class="form-label">Агент</label>
+    <select name="agent_id" class="form-select">
+      <option value="">Все агенты</option>
+      {% for a in all_agents %}
+        <option value="{{ a.id }}" {% if agent_id_filter == a.id %}selected{% endif %}>
+          {{ a.full_name }} ({{ a.login }})
+        </option>
+      {% endfor %}
+    </select>
+  </div>
+  
+  <div class="col-md-3 d-flex align-items-end">
+    <button type="submit" class="btn btn-primary w-100">Фильтр</button>
+  </div>
+  
+  <div class="col-md-12">
+    <a href="/logs" class="btn btn-outline-secondary">Сбросить фильтры</a>
+  </div>
+</form>
+
+<!-- Статистика -->
+<div class="alert alert-info mb-4">
+  Найдено записей: <strong>{{ total_count }}</strong>
+</div>
+
+<!-- Таблица логов -->
+{% if logs and logs|length > 0 %}
+<div class="table-responsive">
+  <table class="table table-striped table-hover">
+    <thead class="table-light">
+      <tr>
+        <th>Время</th>
+        <th>Действие</th>
+        <th>Агент</th>
+        <th>Тип объекта</th>
+        <th>ID объекта</th>
+        <th>Детали</th>
+        <th>IP</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for log in logs %}
+      <tr>
+        <td>{{ log.timestamp.strftime('%d.%m.%Y %H:%M:%S') }}</td>
+        <td>
+          {% if log.action == 'login' %}
+            <span class="badge bg-success">Вход</span>
+          {% elif log.action == 'login_failed' %}
+            <span class="badge bg-danger">Неудачный вход</span>
+          {% elif log.action == 'logout' %}
+            <span class="badge bg-secondary">Выход</span>
+          {% elif log.action == 'create' %}
+            <span class="badge bg-primary">Создание</span>
+          {% elif log.action == 'update' %}
+            <span class="badge bg-warning text-dark">Изменение</span>
+          {% elif log.action == 'delete' %}
+            <span class="badge bg-danger">Удаление</span>
+          {% else %}
+            <span class="badge bg-info">{{ log.action }}</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if log.agent %}
+            {{ log.agent.full_name }}<br>
+            <small class="text-muted">{{ log.agent.login }}</small>
+          {% else %}
+            <span class="text-muted">—</span>
+          {% endif %}
+        </td>
+        <td>{{ log.entity_type }}</td>
+        <td>
+          {% if log.entity_id %}
+            <code>{{ log.entity_id }}</code>
+          {% else %}
+            <span class="text-muted">—</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if log.details %}
+            <small class="text-muted">{{ log.details[:100] }}{% if log.details|length > 100 %}...{% endif %}</small>
+          {% else %}
+            <span class="text-muted">—</span>
+          {% endif %}
+        </td>
+        <td><code>{{ log.ip_address or '—' }}</code></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Пагинация -->
+<nav>
+  <ul class="pagination">
+    {% if offset > 0 %}
+      <li class="page-item">
+        <a class="page-link" href="?offset={{ max(0, offset - limit) }}&limit={{ limit }}{% if action_filter %}&action={{ action_filter }}{% endif %}{% if entity_type_filter %}&entity_type={{ entity_type_filter }}{% endif %}{% if agent_id_filter %}&agent_id={{ agent_id_filter }}{% endif %}">← Назад</a>
+      </li>
+    {% endif %}
+    {% if logs|length == limit %}
+      <li class="page-item">
+        <a class="page-link" href="?offset={{ offset + limit }}&limit={{ limit }}{% if action_filter %}&action={{ action_filter }}{% endif %}{% if entity_type_filter %}&entity_type={{ entity_type_filter }}{% endif %}{% if agent_id_filter %}&agent_id={{ agent_id_filter }}{% endif %}">Вперёд →</a>
+      </li>
+    {% endif %}
+  </ul>
+</nav>
+
+{% else %}
+  <div class="alert alert-info">Записей в логах не найдено.</div>
+{% endif %}
+{% endblock %}

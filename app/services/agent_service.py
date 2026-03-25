@@ -24,6 +24,7 @@ class AgentService:
         agent = Agent(
             full_name=agent_data.full_name,
             email=agent_data.email,
+            login=agent_data.login,
             password_hash=agent_data.password_hash,
             role=agent_data.role,
             category_access=agent_data.category_access,

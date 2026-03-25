@@ -4,14 +4,69 @@
 
 {% block content %}
   <h1>Список тикетов</h1>
+  <form method="get" action="/tickets" style="margin-bottom: 16px;">
+    <p>
+      <label>Поиск: <input type="text" name="q" value="{{ q or '' }}" placeholder="track_id / тема / клиент" /></label>
+      <label>Статус:
+        <select name="status_id">
+          <option value="">Все</option>
+          {% for s in statuses %}
+            <option value="{{ s.id }}" {% if filters.status_id == s.id %}selected{% endif %}>{{ s.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Категория:
+        <select name="category_id">
+          <option value="">Все</option>
+          {% for c in categories %}
+            <option value="{{ c.id }}" {% if filters.category_id == c.id %}selected{% endif %}>{{ c.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    </p>
+    <p>
+      <label>Сортировка:
+        <select name="sort_by">
+          {% for f in ["id", "track_id", "created_at", "updated_at", "status_id", "priority"] %}
+            <option value="{{ f }}" {% if sort_by == f %}selected{% endif %}>{{ f }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>
+        <input type="checkbox" name="sort_desc" value="true" {% if sort_desc %}checked{% endif %} />
+        По убыванию
+      </label>
+      <label>Лимит:
+        <input type="number" name="limit" value="{{ limit }}" min="1" max="500" style="width:80px;" />
+      </label>
+      <button type="submit">Применить</button>
+      <a href="/tickets">Сбросить</a>
+    </p>
+  </form>
+
   {% if tickets and tickets|length > 0 %}
-    <ul>
-      {% for t in tickets %}
-        <li>
-          <a href="/tickets/{{ t.id }}">{{ t.id }} / {{ t.track_id }}</a>
-        </li>
-      {% endfor %}
-    </ul>
+    <table border="1" cellpadding="6" cellspacing="0" style="border-collapse: collapse; width: 100%;">
+      <thead>
+        <tr>
+          <th>ID / Трек</th>
+          <th>Дата создания</th>
+          <th>Категория</th>
+          <th>Статус</th>
+          <th>Тема</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in tickets %}
+          <tr>
+            <td><a href="/tickets/{{ t.id }}">{{ t.id }} / {{ t.track_id }}</a></td>
+            <td>{{ t.created_at or "—" }}</td>
+            <td>{{ category_name_by_id.get(t.category_id, t.category_id or "—") }}</td>
+            <td>{{ status_name_by_id.get(t.status_id, t.status_id or "—") }}</td>
+            <td>{{ t.subject }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
   {% else %}
     <p>Пока тикеты не загружены.</p>
   {% endif %}

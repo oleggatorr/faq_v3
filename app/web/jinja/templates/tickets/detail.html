@@ -1,62 +1,186 @@
 {% extends "base.html" %}
 
-{% block title %}{% if ticket %}Тикет {{ ticket.track_id }}{% else %}Тикет не найден{% endif %}{% endblock %}
+{% block title %}Тикет {{ ticket.track_id }}{% endblock %}
 
 {% block content %}
-  {% if error %}
-    <p class="error">{{ error }}</p>
-  {% elif ticket %}
-    <h1>Тикет #{{ ticket.id }} ({{ ticket.track_id }})</h1>
+{% if error %}
+  <p class="error">{{ error }}</p>
+{% elif ticket %}
+
+  <!-- Заголовок + метаданные -->
+  <div class="ticket-header">
+    <h1>Тикет #{{ ticket.id }} <small>({{ ticket.track_id }})</small></h1>
     <p><strong>Тема:</strong> {{ ticket.subject }}</p>
     <p><strong>Заявитель:</strong> {{ ticket.customer_name }} &lt;{{ ticket.customer_email }}&gt;</p>
-    <p><strong>Статус ID:</strong> {{ ticket.status_id }} | <strong>Приоритет:</strong> {{ ticket.priority }}</p>
-    <p><strong>Департамент:</strong> {{ ticket.department_id }} | <strong>Категория:</strong> {{ ticket.category_id or '—' }}</p>
-    <hr>
+    
+    <!-- Быстрая панель статусов -->
+    <div class="ticket-meta">
+      <span class="badge status-{{ ticket.status_id }}">Статус: {{ status_name_by_id.get(ticket.status_id, ticket.status_id) }}</span>
+      <span class="badge priority-{{ ticket.priority.value }}">Приоритет: {{ ticket.priority.value }}</span>
+      {% if ticket.is_locked %}<span class="badge locked">🔒 Заблокирован</span>{% endif %}
+      {% if ticket.is_archived %}<span class="badge archived">📦 В архиве</span>{% endif %}
 
-    <h2>Сообщения</h2>
-    <form method="post" action="/tickets/{{ ticket.id }}/reply" enctype="multipart/form-data">
+      <form method="post" action="/tickets/{{ ticket.id }}/delete" style="display: inline;" 
+            onsubmit="return confirm('⚠️ Вы уверены, что хотите удалить тикет #{{ ticket.id }}? Это действие нельзя отменить.');">
+        <button type="submit" class="btn-danger" onclick="event.stopPropagation();">🗑️ Удалить тикет</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Форма: Ответ / Внутренняя заметка -->
+  <details class="admin-panel" open>
+    <summary><strong>✍️ Написать ответ</strong></summary>
+    <form method="post" action="/tickets/{{ ticket.id }}/reply" enctype="multipart/form-data" class="mt-2">
       <p>
-        <label>Ответ:<br /><textarea name="body" rows="4" cols="60" required></textarea></label>
+        <label>Текст сообщения:<br>
+          <textarea name="body" rows="5" cols="70" required placeholder="Введите ответ..."></textarea>
+        </label>
+      </p>
+      <p>
+        <label>
+          <input type="checkbox" name="is_internal" value="true" />
+          <strong>Внутренняя заметка</strong> (не видна клиенту)
+        </label>
       </p>
       <p>
         <label>Вложения: <input type="file" name="attachments" multiple /></label>
       </p>
-      <button type="submit">Отправить ответ</button>
+      <button type="submit" class="btn-primary">Отправить</button>
     </form>
-    <hr />
-    {% if messages %}
-      {% for msg in messages %}
-        <div class="message{% if msg.is_internal %} internal{% endif %}">
-          <p><small>{{ msg.created_at }} | {{ 'Внутренняя заметка' if msg.is_internal else 'Сообщение' }}</small></p>
-          <p>{{ msg.body }}</p>
-          {% set msg_attachments = attachments_by_message.get(msg.id, []) %}
-          {% if msg_attachments %}
+  </details>
+
+  <!-- Форма: Изменить параметры тикета -->
+  <details class="admin-panel">
+    <summary><strong>⚙️ Параметры тикета</strong></summary>
+    <form method="post" action="/tickets/{{ ticket.id }}/update" class="mt-2 grid-form">
+      <div class="form-row">
+        <label>
+          Статус:
+          <select name="status_id">
+            <option value="">— не менять —</option>
+            {% for s in statuses %}
+              <option value="{{ s.id }}" {% if s.id == ticket.status_id %}selected{% endif %}>
+                {{ s.name }}
+              </option>
+            {% endfor %}
+          </select>
+        </label>
+
+        <label>
+          Приоритет:
+          <select name="priority">
+            <option value="">— не менять —</option>
+            {% for p in priorities %}
+              <option value="{{ p.value }}" {% if p.value == ticket.priority.value %}selected{% endif %}>
+                {{ p.value }}
+              </option>
+            {% endfor %}
+          </select>
+        </label>
+
+        <label>
+          Исполнитель:
+          <select name="owner_id">
+            <option value="0">— снять назначение —</option>
+            <!-- Здесь можно подгрузить список агентов через context -->
+            {% for a in agents|default([]) %}
+              <option value="{{ a.id }}" {% if a.id == ticket.owner_id %}selected{% endif %}>
+                {{ a.full_name }} ({{ a.email }})
+              </option>
+            {% endfor %}
+          </select>
+        </label>
+
+        <label>
+          Категория:
+          <select name="category_id">
+            <option value="0">— не менять —</option>
+            {% for c in categories|default([]) %}
+              <option value="{{ c.id }}" {% if c.id == ticket.category_id %}selected{% endif %}>
+                {{ c.name }}
+              </option>
+            {% endfor %}
+          </select>
+        </label>
+      </div>
+
+      <div class="form-row checkboxes">
+        <label><input type="checkbox" name="is_locked" value="true" {% if ticket.is_locked %}checked{% endif %}> 🔒 Заблокировать</label>
+        <label><input type="checkbox" name="is_archived" value="true" {% if ticket.is_archived %}checked{% endif %}> 📦 В архив</label>
+      </div>
+
+      <button type="submit" class="btn-secondary">Сохранить изменения</button>
+    </form>
+  </details>
+
+  <hr>
+
+  <!-- Сообщения -->
+  <h2>Переписка</h2>
+  {% if messages %}
+    {% for msg in messages %}
+      <div class="message {% if msg.is_internal %}internal{% endif %}">
+        <div class="message-meta">
+          <small>
+            {{ msg.created_at.strftime('%d.%m.%Y %H:%M') }} |
+            {% if msg.is_internal %}
+              <span class="badge internal">🔐 Внутренняя заметка</span>
+            {% else %}
+              {% if msg.agent_id %}
+                <span class="badge agent">👤 {{ msg.agent_full_name|default('Агент') }}</span>
+              {% else %}
+                <span class="badge customer">👤 Клиент</span>
+              {% endif %}
+            {% endif %}
+          </small>
+        </div>
+        <div class="message-body">{{ msg.body|nl2br }}</div>
+        
+        {% set msg_attachments = attachments_by_message.get(msg.id, []) %}
+        {% if msg_attachments %}
+          <div class="attachments">
+            <strong>Вложения:</strong>
             <ul>
               {% for att in msg_attachments %}
                 <li>
-                  <a href="/attachments/{{ att.id }}/download">{{ att.original_filename }}</a>
-                  ({{ att.file_size }} bytes)
+                  <a href="/attachments/{{ att.id }}/download" target="_blank">
+                    {{ att.original_filename }}
+                  </a>
+                  <small>({{ (att.file_size / 1024)|round(1) }} KB)</small>
                 </li>
               {% endfor %}
             </ul>
-          {% endif %}
-        </div>
-      {% endfor %}
-    {% else %}
-      <p>Сообщений нет.</p>
-    {% endif %}
+          </div>
+        {% endif %}
+      </div>
+    {% endfor %}
+  {% else %}
+    <p><em>Сообщений пока нет.</em></p>
+  {% endif %}
 
-    <hr>
-    <h2>История событий</h2>
+  <!-- История событий -->
+  <details>
+    <summary><strong>📜 История изменений</strong></summary>
     {% if events %}
-      <ul>
+      <ul class="event-log">
         {% for ev in events %}
-          <li>{{ ev.occurred_at }} | {{ ev.action_type }} | {{ ev.comment or '—' }}</li>
+          <li>
+            <small>{{ ev.occurred_at.strftime('%d.%m.%Y %H:%M') }}</small> |
+            <strong>{{ ev.action_type }}</strong>
+            {% if ev.comment %}<em>— {{ ev.comment }}</em>{% endif %}
+            {% if ev.field_name and ev.old_value != ev.new_value %}
+              <br><small class="muted">
+                {{ ev.field_name }}: 
+                <del>{{ ev.old_value }}</del> → <ins>{{ ev.new_value }}</ins>
+              </small>
+            {% endif %}
+          </li>
         {% endfor %}
       </ul>
     {% else %}
-      <p>Событий нет.</p>
+      <p><em>Событий нет.</em></p>
     {% endif %}
-  {% endif %}
-{% endblock %}
+  </details>
 
+{% endif %}
+{% endblock %}

@@ -13,9 +13,6 @@
     <h2>Написать сообщение</h2>
     <form method="post" action="/ticket/{{ ticket.track_id }}/message" enctype="multipart/form-data">
       <p>
-        <label>Email (как при создании): <input type="email" name="email" required /></label>
-      </p>
-      <p>
         <label>Сообщение:<br />
           <textarea name="body" rows="4" cols="60" required></textarea>
         </label>

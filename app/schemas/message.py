@@ -17,8 +17,18 @@ class MessageBase(BaseModel):
     ip_address: str | None = None
 
 
-class MessageCreate(MessageBase):
-    pass
+class MessageCreate(BaseModel):
+    ticket_id: int
+    body: str
+    subject: str | None = None
+    
+    # Делаем поля опциональными, так как сервис подставит их сам
+    customer_name: str | None = None 
+    customer_email: str | None = None
+    
+    is_internal: bool = False
+    is_automatic: bool = False
+    ip_address: str | None = None
 
 
 class MessageUpdate(BaseModel):

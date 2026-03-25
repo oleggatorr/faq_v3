@@ -10,6 +10,7 @@
     <header>
       <nav>
         {% if agent %}
+          <button type="button" class="back-btn" onclick="goBack()">← Назад</button> |
           <a href="/home-page">Домой</a> |
           <a href="/tickets">Тикеты</a> |
           <a href="/agents">Операторы</a> |
@@ -19,6 +20,7 @@
           | {{ agent.full_name }} |
           <form method="post" action="/logout" style="display:inline;"><button type="submit">Выход</button></form>
         {% else %}
+          <button type="button" class="back-btn" onclick="goBack()">← Назад</button> |
           <a href="/new-ticket">Создать обращение</a> |
           <a href="/get-ticket">Найти по треку</a> |
           <a href="/login">Вход</a>

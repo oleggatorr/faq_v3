@@ -54,11 +54,19 @@ class MessageService:
         if ticket is None:
             raise NotFound("Ticket not found")
 
+        if agent_id is None:
+            customer_name = ticket.customer_name
+            customer_email = ticket.customer_email
+        else:
+            # Если пишет агент, поля клиента не заполняем (или можно оставить для истории)
+            customer_name = None
+            customer_email = None
+
         message = Message(
             ticket_id=message_data.ticket_id,
             agent_id=agent_id,
-            customer_name=message_data.customer_name,
-            customer_email=message_data.customer_email,
+            customer_name=customer_name,
+            customer_email=customer_email,
             subject=message_data.subject,
             body=message_data.body,
             is_internal=message_data.is_internal,

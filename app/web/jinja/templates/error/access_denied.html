@@ -3,35 +3,50 @@
 {% block title %}Нет прав доступа{% endblock %}
 
 {% block content %}
-<div class="container mt-5">
-  <div class="row justify-content-center">
-    <div class="col-md-6">
-      <div class="card border-danger">
-        <div class="card-header bg-danger text-white">
-          <h4 class="mb-0">🚫 Нет прав доступа</h4>
-        </div>
-        <div class="card-body text-center">
-          <p class="lead">У вас недостаточно прав для просмотра этой страницы.</p>
-          <p class="text-muted">
-            {% if required_permission %}
-              Требуемое право: <code>{{ required_permission }}</code>
-            {% endif %}
-          </p>
-          <hr>
-          <div class="mt-4">
-            <a href="/" class="btn btn-primary">🏠 На главную</a>
-            {% if agent %}
-              {% if view_tickets %}
-                <a href="/tickets" class="btn btn-outline-secondary">📋 Тикеты</a>
-              {% endif %}
-              {% if agent_view %}
-                <a href="/agents" class="btn btn-outline-secondary">👥 Операторы</a>
-              {% endif %}
-              {% if audit_logs_view %}
-                <a href="/logs" class="btn btn-outline-secondary">📊 Логи</a>
-              {% endif %}
-            {% endif %}
+<div class="row justify-content-center">
+  <div class="col-md-6 col-lg-5">
+    <div class="card border-danger">
+      <div class="card-header bg-danger text-white text-center">
+        <h2 class="h4 mb-0">🚫 Нет прав доступа</h2>
+      </div>
+      <div class="card-body text-center">
+        <p class="lead mb-3">
+          У вас недостаточно прав для просмотра этой страницы.
+        </p>
+        
+        {% if required_permission %}
+          <div class="alert alert-warning mb-3">
+            <strong>Требуемое право:</strong><br>
+            <code>{{ required_permission }}</code>
           </div>
+        {% endif %}
+        
+        <hr>
+        
+        <div class="d-grid gap-2">
+          <a href="/" class="btn btn-primary">
+            🏠 На главную
+          </a>
+          
+          {% if agent %}
+            {% if view_tickets %}
+              <a href="/tickets" class="btn btn-outline-secondary">
+                📋 Тикеты
+              </a>
+            {% endif %}
+            
+            {% if agent_view %}
+              <a href="/agents" class="btn btn-outline-secondary">
+                👥 Операторы
+              </a>
+            {% endif %}
+            
+            {% if audit_logs_view %}
+              <a href="/logs" class="btn btn-outline-secondary">
+                📊 Логи
+              </a>
+            {% endif %}
+          {% endif %}
         </div>
       </div>
     </div>

@@ -7,12 +7,17 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.middleware.sessions import SessionMiddleware
 
+from app.core.config import settings
 from app.core.errors import AccessDeniedError
 from app.web.api.routes import router as api_router
 from app.web.jinja.routes import router as jinja_router
 
 app = FastAPI(title="fastapi_projecr")
+
+# Session middleware для flash-сообщений
+app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY)
 
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "web" / "jinja" / "templates"))
 

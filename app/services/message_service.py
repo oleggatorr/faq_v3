@@ -55,16 +55,23 @@ class MessageService:
             raise NotFound("Ticket not found")
 
         if agent_id is None:
+            # Сообщение от клиента
             customer_name = ticket.customer_name
             customer_email = ticket.customer_email
+            sender_name = ticket.customer_name  # ФИО отправителя = имя клиента
+            print(f"DEBUG: Client message - ticket.customer_name={repr(ticket.customer_name)}, sender_name={repr(sender_name)}")
         else:
-            # Если пишет агент, поля клиента не заполняем (или можно оставить для истории)
+            # Сообщение от агента
+            from app.models.agent import Agent
+            agent = self.session.query(Agent).filter(Agent.id == agent_id).one_or_none()
             customer_name = None
             customer_email = None
+            sender_name = agent.full_name if agent else None  # ФИО отправителя = ФИО агента
 
         message = Message(
             ticket_id=message_data.ticket_id,
             agent_id=agent_id,
+            sender_name=sender_name,  # Заполняем ФИО отправителя
             customer_name=customer_name,
             customer_email=customer_email,
             subject=message_data.subject,

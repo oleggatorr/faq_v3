@@ -50,6 +50,7 @@ def login_submit(
     next: str = Form("/"),
 ):
     agent = db.query(Agent).filter(Agent.login == login, Agent.is_active == True).one_or_none()
+    
     if not agent or not verify_password(password, agent.password_hash):
         # Логируем неудачную попытку входа
         client_info = get_client_info(request)
@@ -62,7 +63,7 @@ def login_submit(
             details={"login_attempt": login, "reason": "invalid_credentials"},
             **client_info,
         )
-        
+
         return templates.TemplateResponse(
             "auth/login.html",
             {
@@ -73,8 +74,14 @@ def login_submit(
             },
             status_code=401,
         )
+
+    # Успешный вход — логируем и обновляем время последнего входа
+    from datetime import datetime, timezone
     
-    # Успешный вход — логируем
+    # Обновляем last_login_at
+    agent.last_login_at = datetime.now(timezone.utc)
+    db.commit()
+    
     client_info = get_client_info(request)
     log_service = AuditLogService(db)
     log_service.log_action(
@@ -85,16 +92,26 @@ def login_submit(
         details={"method": "password"},
         **client_info,
     )
-    
+
     token = create_access_token(data={"sub": str(agent.id)})
-    response = RedirectResponse(url=unquote(next) if next else "/", status_code=303)
+    
+    # Перенаправляем с flash-сообщением
+    redirect_url = unquote(next) if next else "/"
+    
+    response = RedirectResponse(url=redirect_url, status_code=303)
     response.set_cookie(
         key=settings.COOKIE_NAME,
         value=token,
         max_age=settings.COOKIE_MAX_AGE,
         httponly=True,
         samesite="lax",
+        path="/",
+        secure=False,
     )
+    
+    # Flash-сообщение об успешном входе
+    request.session["flash_success"] = f"С возвращением, {agent.full_name}!"
+
     return response
 
 
@@ -116,7 +133,11 @@ def logout(
             details={},
             **client_info,
         )
-    
+
     response = RedirectResponse(url="/", status_code=303)
     response.delete_cookie(key=settings.COOKIE_NAME)
+    
+    # Flash-сообщение о выходе
+    request.session["flash_info"] = "Вы успешно вышли из системы"
+    
     return response

@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+
+{% block title %}Добавить оператора{% endblock %}
+
+{% block content %}
+<h1>Добавить оператора</h1>
+
+{% if error %}
+  <p style="color:red;">{{ error }}</p>
+{% endif %}
+
+<form method="post">
+
+  <div>
+    <label>ФИО:</label><br>
+    <input type="text" name="full_name" required>
+  </div>
+
+  <div>
+    <label>Логин:</label><br>
+    <input type="text" name="login" required>
+  </div>
+
+  <div>
+    <label>Email:</label><br>
+    <input type="email" name="email" required>
+  </div>
+
+  <div>
+    <label>Пароль:</label><br>
+    <input type="password" name="password" id="password" required>
+  </div>
+
+  <div>
+    <label>Подтверждение пароля:</label><br>
+    <input type="password" name="password_confirm" id="password_confirm" required>
+  </div>
+
+  <div>
+    <label>Роль:</label><br>
+    <select name="role" id="role" onchange="toggleFields()">
+      <option value="operator">Оператор</option>
+      <option value="admin">Администратор</option>
+    </select>
+  </div>
+
+  <div>
+    <label>Основной департамент:</label><br>
+    <select name="department_id">
+      {% for d in departments %}
+        <option value="{{ d.id }}">{{ d.name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <hr>
+
+  <!-- Категории вопросов -->
+  <div id="category_block">
+    <label>Доступ к категориям вопросов:</label><br>
+    {% for cat in categories %}
+      <input type="checkbox" name="category_access" value="{{ cat.id }}">
+      {{ cat.name }}<br>
+    {% endfor %}
+  </div>
+
+  <br>
+
+  <!-- Права -->
+  <div id="permissions_block">
+    <label>Права:</label><br>
+
+    {% for p in permissions_list %}
+        <input type="checkbox" name="permissions" value="{{ p.value }}">
+        {{ permission_labels.get(p, p.value) }}<br>
+    {% endfor %}
+
+  </div>
+
+  <br>
+  <button type="submit">Создать</button>
+</form>
+
+<script>
+function toggleFields() {
+  const role = document.getElementById("role").value;
+
+  const category = document.getElementById("category_block");
+  const permissions = document.getElementById("permissions_block");
+
+  if (role === "admin") {
+    category.style.display = "none";
+    permissions.style.display = "none";
+  } else {
+    category.style.display = "block";
+    permissions.style.display = "block";
+  }
+}
+
+// Проверка совпадения паролей
+function validatePasswords() {
+  const password = document.getElementById("password").value;
+  const passwordConfirm = document.getElementById("password_confirm").value;
+  
+  if (password !== passwordConfirm) {
+    alert("Пароли не совпадают!");
+    return false;
+  }
+  return true;
+}
+
+// при загрузке
+window.onload = toggleFields;
+
+// Добавляем проверку при отправке формы
+document.querySelector("form").onsubmit = validatePasswords;
+</script>
+
+{% endblock %}

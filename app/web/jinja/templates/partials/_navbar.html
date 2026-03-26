@@ -1,0 +1,101 @@
+{# Навигационная панель #}
+<nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom">
+  <div class="container-fluid">
+    <a class="navbar-brand fw-bold" href="/">
+      🏠 Admin Panel
+    </a>
+    
+    {% if agent %}
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav me-auto">
+          <li class="nav-item">
+            <a class="nav-link" href="/home-page">
+              🏠 Домой
+            </a>
+          </li>
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" id="ticketsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+              📋 Тикеты
+            </a>
+            <ul class="dropdown-menu" aria-labelledby="ticketsDropdown">
+              <li><a class="dropdown-item" href="/tickets">📂 Все тикеты</a></li>
+              <li><a class="dropdown-item" href="/tickets/my">📋 Назначенные мне</a></li>
+              <li><hr class="dropdown-divider"></li>
+              <li><a class="dropdown-item" href="/tickets/create">➕ Создать тикет</a></li>
+            </ul>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="/agents">
+              👥 Операторы
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="/departments">
+              🏢 Департаменты
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="/question-category-list">
+              📁 Категории
+            </a>
+          </li>
+          {% if agent.role == 'admin' %}
+            <li class="nav-item">
+              <a class="nav-link" href="/logs">
+                📊 Логи
+              </a>
+            </li>
+          {% endif %}
+        </ul>
+        
+        <ul class="navbar-nav">
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+              👤 {{ agent.login }}
+              <span class="badge bg-{% if agent.role == 'admin' %}danger{% else %}success{% endif %}">
+                {% if agent.role == 'admin' %}
+                  Администратор
+                {% else %}
+                  Оператор
+                {% endif %}
+              </span>
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdown">
+              <li><a class="dropdown-item" href="/accaunt">⚙️ Настройки</a></li>
+              <li><hr class="dropdown-divider"></li>
+              <li>
+                <form method="post" action="/logout" class="d-inline">
+                  <button type="submit" class="dropdown-item text-danger">
+                    🚪 Выход
+                  </button>
+                </form>
+              </li>
+            </ul>
+          </li>
+        </ul>
+      </div>
+    {% else %}
+      <ul class="navbar-nav ms-auto">
+        <li class="nav-item">
+          <a class="nav-link" href="/new-ticket">
+            📝 Создать обращение
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="/get-ticket">
+            🔍 Найти по треку
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="/login">
+            🔐 Вход
+          </a>
+        </li>
+      </ul>
+    {% endif %}
+  </div>
+</nav>

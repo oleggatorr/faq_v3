@@ -161,6 +161,15 @@ def check_can_del_tickets(request: Request, db: Session = Depends(get_db)) -> Ag
         raise AccessDeniedError("Нет прав доступа", required_permission="can_del_tickets")
     return agent
 
+
+def check_can_hard_del_tickets(request: Request, db: Session = Depends(get_db)) -> AgentRead:
+    agent = get_current_agent(request, db)
+    if agent.role == AgentRole.admin:
+        return agent
+    if not agent.has_permission(Permission.can_hard_del_tickets):
+        raise AccessDeniedError("Нет прав доступа", required_permission="can_hard_del_tickets")
+    return agent
+
 def check_agent_view(request: Request, db: Session = Depends(get_db)) -> AgentRead:
     agent = get_current_agent(request, db)
     if agent.role == AgentRole.admin:
@@ -199,6 +208,16 @@ def check_audit_logs_view(request: Request, db: Session = Depends(get_db)) -> Ag
         return agent
     if not agent.has_permission(Permission.audit_logs_view):
         raise AccessDeniedError("Нет прав доступа", required_permission="audit_logs_view")
+    return agent
+
+
+def check_category_manage(request: Request, db: Session = Depends(get_db)) -> AgentRead:
+    """Проверка права на управление категориями вопросов."""
+    agent = get_current_agent(request, db)
+    if agent.role == AgentRole.admin:
+        return agent
+    if not agent.has_permission(Permission.can_man_cat):
+        raise AccessDeniedError("Нет прав доступа", required_permission="can_man_cat")
     return agent
 
 

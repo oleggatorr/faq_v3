@@ -13,7 +13,6 @@ from app.core.auth import (
     CurrentAgent,
 )
 from app.core.permissions import (
-    DEFAULT_OPERATOR_PERMISSIONS,
     Permission,
     PERMISSION_LABELS,
 )
@@ -131,11 +130,10 @@ def add_agent_submit(
     phone: str | None = Form(None),
 ):
     agent_service = AgentService(db)
-    
-    # Если права не выбраны вручную, выдаём права по умолчанию для оператора
-    if not permissions and role == "operator":
-        permissions = [p.value for p in DEFAULT_OPERATOR_PERMISSIONS]
-    
+
+    # Права остаются как есть (может быть пустым списком)
+    # Администратору права не нужны - у него полный доступ
+
     # Проверка совпадения паролей
     if password != password_confirm:
         categories = db.query(QuestionCategory).filter(
@@ -239,7 +237,7 @@ def add_agent_submit(
             phone=phone.strip() if phone else None,
         )
 
-        agent_service.create(agent_data=agent_data)
+        new_agent = agent_service.create(agent_data=agent_data)
 
         # Логируем создание агента
         client_info = get_client_info(request)
@@ -257,6 +255,9 @@ def add_agent_submit(
             },
             **client_info,
         )
+
+        # Flash-сообщение об успехе
+        request.session["flash_success"] = f"Агент {full_name} успешно создан!"
 
         return RedirectResponse(url="/agents", status_code=303)
 
@@ -360,10 +361,9 @@ def edit_agent_submit(
     is_active: bool = Form(False),
 ):
     agent_service = AgentService(db)
-    
-    # Если права не выбраны вручную, выдаём права по умолчанию для оператора
-    if not permissions and role == "operator":
-        permissions = [p.value for p in DEFAULT_OPERATOR_PERMISSIONS]
+
+    # Права остаются как есть (может быть пустым списком)
+    # Администратору права не нужны - у него полный доступ
 
     # Проверка совпадения паролей
     if password or password_confirm:
@@ -444,7 +444,10 @@ def edit_agent_submit(
             },
             **client_info,
         )
-        
+
+        # Flash-сообщение об успехе
+        request.session["flash_success"] = f"Агент {full_name} успешно обновлён!"
+
         return RedirectResponse(url="/agents", status_code=303)
 
     except Exception as e:
@@ -512,16 +515,13 @@ def delete_agent(
             details={"deleted_agent_id": agent_id},
             **client_info,
         )
-        
+
+        # Flash-сообщение об успехе
+        request.session["flash_success"] = "Агент успешно удалён!"
+
         return RedirectResponse(url="/agents", status_code=303)
     else:
-        return templates.TemplateResponse(
-            "agents/list.html",
-            {
-                "request": request,
-                "agents": agent_service.list(limit=50),
-                "agent": agent,
-                "error": result.detail or "Ошибка при удалении",
-            },
-            status_code=400,
-        )
+        # Flash-сообщение об ошибке
+        request.session["flash_error"] = result.detail or "Ошибка при удалении агента"
+        
+        return RedirectResponse(url="/agents", status_code=303)

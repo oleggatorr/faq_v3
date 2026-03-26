@@ -432,6 +432,9 @@ async def new_ticket_submit(
             status_code=409,
         )
 
+    # Flash-сообщение об успешном создании
+    request.session["flash_success"] = f"Обращение успешно создано! Трек-номер: {ticket.track_id}"
+
     return templates.TemplateResponse(
         "tickets/created.html",
         {

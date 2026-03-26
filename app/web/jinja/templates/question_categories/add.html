@@ -3,6 +3,67 @@
 {% block title %}Добавить категорию{% endblock %}
 
 {% block content %}
-  <h1>Добавить категорию</h1>
-  <p>Заглушка страницы. Позже добавим форму создания категории.</p>
+<div class="page-header">
+  <h1 class="page-title">📁 Добавить категорию</h1>
+  <a href="/question-category-list" class="btn btn-outline-secondary">
+    ← Назад к списку
+  </a>
+</div>
+
+<div class="row justify-content-center">
+  <div class="col-lg-6">
+    <div class="card">
+      <div class="card-header">
+        <h2 class="h4 mb-0">➕ Создание категории</h2>
+      </div>
+      <div class="card-body">
+        <form method="post" action="/question-category-add">
+          <div class="mb-3">
+            <label for="name" class="form-label">Название категории *</label>
+            <input 
+              type="text" 
+              class="form-control" 
+              id="name"
+              name="name" 
+              required
+              placeholder="Например: Технические вопросы"
+            />
+          </div>
+
+          <div class="mb-3">
+            <label for="department_id" class="form-label">Департамент</label>
+            <select name="department_id" id="department_id" class="form-select">
+              <option value="">— Не выбран —</option>
+              {% for d in departments %}
+                <option value="{{ d.id }}">{{ d.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="mb-3 form-check">
+            <input 
+              type="checkbox" 
+              class="form-check-input" 
+              id="is_active"
+              name="is_active"
+              checked
+            />
+            <label class="form-check-label" for="is_active">
+              Активна
+            </label>
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">
+              ✓ Создать
+            </button>
+            <a href="/question-category-list" class="btn btn-outline-secondary">
+              Отмена
+            </a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}

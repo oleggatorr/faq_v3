@@ -3,9 +3,33 @@
 {% block title %}Изменить пользователя{% endblock %}
 
 {% block content %}
-  <h1>Изменить пользователя</h1>
-  <p>Заглушка. Позже добавим выбор пользователя и форму редактирования.</p>
-  {% if error %}
-    <p style="color:red;">{{ error }}</p>
-  {% endif %}
+<div class="row justify-content-center">
+  <div class="col-lg-6">
+    <div class="card">
+      <div class="card-header">
+        <h2 class="h4 mb-0">✏️ Изменить пользователя</h2>
+      </div>
+      <div class="card-body">
+        {% if error %}
+          <div class="alert alert-danger" role="alert">
+            {{ error }}
+          </div>
+        {% endif %}
+
+        <div class="alert alert-info">
+          <p class="mb-0">
+            ℹ️ Эта страница находится в разработке. Для редактирования оператора используйте 
+            <a href="/agents">список операторов</a>.
+          </p>
+        </div>
+
+        <div class="form-actions">
+          <a href="/agents" class="btn btn-primary">
+            👥 К списку операторов
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}

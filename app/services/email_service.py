@@ -58,11 +58,9 @@ def send_email(
         if reply_to:
             msg["Reply-To"] = reply_to
         
-        print(">>> DEBUG EMAIL_HOST:", repr(EMAIL_HOST))
-        print(">>> DEBUG EMAIL_PORT:", repr(EMAIL_PORT))
-        print("EMAIL_USER:", repr(EMAIL_USER))
-        print("EMAIL_PASSWORD:", repr(EMAIL_PASSWORD))
-        print("adaadadadda",actual_to)
+        if int(os.getenv("IS_DEBUG")):
+            print("email suspend")
+            return
 
         with smtplib.SMTP(EMAIL_HOST, EMAIL_PORT) as smtp:
             smtp.starttls()

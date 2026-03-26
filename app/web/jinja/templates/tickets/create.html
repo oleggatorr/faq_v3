@@ -1,57 +1,54 @@
 {% extends "base.html" %}
 
-{% block title %}Создать обращение{% endblock %}
+{% block title %}Создать тикет{% endblock %}
 
 {% block content %}
+<div class="page-header">
+  <h1 class="page-title">📝 Создать тикет</h1>
+  <a href="/tickets" class="btn btn-outline-secondary">
+    ← Назад к списку
+  </a>
+</div>
+
 <div class="row justify-content-center">
   <div class="col-lg-8">
     <div class="card">
       <div class="card-header">
-        <h2 class="h4 mb-0">📝 Новое обращение</h2>
+        <h2 class="h4 mb-0">📋 Новое обращение от клиента</h2>
       </div>
       <div class="card-body">
-        {% if error %}
-          <div class="alert alert-danger" role="alert">
-            {{ error }}
-          </div>
-        {% endif %}
-
-        <form method="post" action="/new-ticket" enctype="multipart/form-data">
-          <!-- Контактные данные -->
-          <h5 class="mb-3">👤 Контактные данные</h5>
+        <form method="post" action="/tickets/create" enctype="multipart/form-data">
+          <!-- Контактные данные клиента -->
+          <h5 class="mb-3">👤 Данные клиента</h5>
           
           <div class="row g-3 mb-4">
             <div class="col-md-6">
-              <label for="customer_name" class="form-label">Ваше имя *</label>
+              <label for="customer_name" class="form-label">Имя клиента *</label>
               <input 
                 type="text" 
                 class="form-control" 
                 id="customer_name"
                 name="customer_name" 
-                value="{{ form_data.customer_name or '' }}" 
-                required 
-                maxlength="200"
+                required
                 placeholder="Иванов Иван"
               />
             </div>
             
             <div class="col-md-6">
-              <label for="customer_email" class="form-label">Email *</label>
+              <label for="customer_email" class="form-label">Email клиента *</label>
               <input 
                 type="email" 
                 class="form-control" 
                 id="customer_email"
                 name="customer_email" 
-                value="{{ form_data.customer_email or '' }}" 
-                required 
-                maxlength="255"
+                required
                 placeholder="ivan@example.com"
               />
             </div>
           </div>
 
-          <!-- Информация об обращении -->
-          <h5 class="mb-3">📋 Информация об обращении</h5>
+          <!-- Информация о тикете -->
+          <h5 class="mb-3">📋 Информация о тикете</h5>
           
           <div class="row g-3 mb-4">
             <div class="col-md-8">
@@ -61,9 +58,7 @@
                 class="form-control" 
                 id="subject"
                 name="subject" 
-                value="{{ form_data.subject or '' }}" 
-                required 
-                maxlength="255"
+                required
                 placeholder="Краткое описание проблемы"
               />
             </div>
@@ -73,9 +68,7 @@
               <select name="department_id" id="department_id" class="form-select" required>
                 <option value="">— Выберите —</option>
                 {% for d in departments %}
-                  <option value="{{ d.id }}" {% if form_data.department_id == d.id %}selected{% endif %}>
-                    {{ d.name }}
-                  </option>
+                  <option value="{{ d.id }}">{{ d.name }}</option>
                 {% endfor %}
               </select>
             </div>
@@ -85,24 +78,21 @@
               <select name="category_id" id="category_id" class="form-select">
                 <option value="">— Не указана —</option>
                 {% for c in categories %}
-                  <option value="{{ c.id }}" {% if form_data.category_id == c.id %}selected{% endif %}>
-                    {{ c.name }}
-                  </option>
+                  <option value="{{ c.id }}">{{ c.name }}</option>
                 {% endfor %}
               </select>
             </div>
             
             <div class="col-md-6">
               <label for="priority" class="form-label">Приоритет</label>
-              <select name="priority" id="priority" class="form-select" disabled>
+              <select name="priority" id="priority" class="form-select">
+                <option value="low">Низкий</option>
                 <option value="normal" selected>Обычный</option>
+                <option value="high">Высокий</option>
+                <option value="critical">Критический</option>
               </select>
-              <small class="text-muted">Приоритет устанавливается оператором</small>
             </div>
           </div>
-
-          <!-- Скрытые поля -->
-          <input type="hidden" name="language_id" value="{{ languages|selectattr('code', 'equalto', 'ru')|map(attribute='id')|first|default('') }}" />
 
           <!-- Сообщение -->
           <div class="mb-4">
@@ -113,31 +103,16 @@
               name="body" 
               rows="8" 
               required
-              placeholder="Подробно опишите вашу проблему..."
-            >{{ form_data.body or '' }}</textarea>
-          </div>
-
-          <!-- Вложения -->
-          <div class="mb-4">
-            <label for="attachments" class="form-label">Вложения</label>
-            <input 
-              type="file" 
-              class="form-control" 
-              id="attachments"
-              name="attachments" 
-              multiple 
-            />
-            <small class="text-muted">
-              Можно прикрепить несколько файлов. Максимальный размер: 10 МБ
-            </small>
+              placeholder="Подробное описание проблемы..."
+            ></textarea>
           </div>
 
           <!-- Кнопки -->
           <div class="form-actions">
             <button type="submit" class="btn btn-primary">
-              📤 Отправить обращение
+              ✓ Создать тикет
             </button>
-            <a href="/" class="btn btn-outline-secondary">
+            <a href="/tickets" class="btn btn-outline-secondary">
               Отмена
             </a>
           </div>

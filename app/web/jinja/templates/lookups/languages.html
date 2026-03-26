@@ -3,15 +3,40 @@
 {% block title %}Языки{% endblock %}
 
 {% block content %}
-  <h1>Языки</h1>
-  {% if languages and languages|length > 0 %}
-    <ul>
-      {% for l in languages %}
-        <li>{{ l.id }} / {{ l.code }} / {{ l.name }}</li>
-      {% endfor %}
-    </ul>
-  {% else %}
-    <p>Пока языки не загружены.</p>
-  {% endif %}
-{% endblock %}
+<div class="page-header">
+  <h1 class="page-title">🌍 Языки</h1>
+</div>
 
+<div class="content-card p-0">
+  {% if languages and languages|length > 0 %}
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead>
+          <tr>
+            <th style="width: 80px;">ID</th>
+            <th>Код</th>
+            <th>Название</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for l in languages %}
+            <tr>
+              <td class="text-muted">{{ l.id }}</td>
+              <td>
+                <code>{{ l.code }}</code>
+              </td>
+              <td>
+                <strong>{{ l.name }}</strong>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="alert alert-info m-3 mb-0">
+      Языки не найдены.
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

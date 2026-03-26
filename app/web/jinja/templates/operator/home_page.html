@@ -3,13 +3,57 @@
 {% block title %}Домашняя страница{% endblock %}
 
 {% block content %}
-  <h1>Домашняя страница оператора</h1>
-  <p>Заглушка. Отсюда можно вести навигацию по админке.</p>
-  <ul>
-    <li><a href="/tickets">Тикеты</a></li>
-    <li><a href="/agents">Операторы</a></li>
-    <li><a href="/departments">Департаменты</a></li>
-    <li><a href="/question-category-list">Категории вопросов</a></li>
-    <li><a href="/accaunt">Аккаунт</a></li>
-  </ul>
+<div class="text-center py-4">
+  <h1 class="mb-4">👋 Домашняя страница оператора</h1>
+  <p class="lead text-muted mb-4">
+    Быстрая навигация по разделам системы
+  </p>
+  
+  <div class="row g-3 justify-content-center">
+    <div class="col-md-6 col-lg-3">
+      <a href="/tickets" class="card text-decoration-none h-100">
+        <div class="card-body text-center">
+          <div class="display-6 mb-2">📋</div>
+          <h3 class="h6">Тикеты</h3>
+        </div>
+      </a>
+    </div>
+    
+    <div class="col-md-6 col-lg-3">
+      <a href="/agents" class="card text-decoration-none h-100">
+        <div class="card-body text-center">
+          <div class="display-6 mb-2">👥</div>
+          <h3 class="h6">Операторы</h3>
+        </div>
+      </a>
+    </div>
+    
+    <div class="col-md-6 col-lg-3">
+      <a href="/departments" class="card text-decoration-none h-100">
+        <div class="card-body text-center">
+          <div class="display-6 mb-2">🏢</div>
+          <h3 class="h6">Департаменты</h3>
+        </div>
+      </a>
+    </div>
+    
+    <div class="col-md-6 col-lg-3">
+      <a href="/question-category-list" class="card text-decoration-none h-100">
+        <div class="card-body text-center">
+          <div class="display-6 mb-2">📁</div>
+          <h3 class="h6">Категории</h3>
+        </div>
+      </a>
+    </div>
+    
+    <div class="col-md-6 col-lg-3">
+      <a href="/accaunt" class="card text-decoration-none h-100">
+        <div class="card-body text-center">
+          <div class="display-6 mb-2">⚙️</div>
+          <h3 class="h6">Аккаунт</h3>
+        </div>
+      </a>
+    </div>
+  </div>
+</div>
 {% endblock %}

@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.models.message import Message
 from app.models.ticket import Ticket
 from app.models.ticket_status import TicketStatus
-from app.models.ticket_event import EventType
+from app.models.ticket_event import EventType, TicketEvent
 from app.schemas.deletion import DeleteResponse
 from app.schemas.ticket import TicketCreate, TicketRead, TicketUpdate
 from app.services.errors import Conflict, NotFound, ValidationFailed
@@ -112,6 +112,7 @@ class TicketService:
         message = Message(
             ticket_id=ticket.id,
             agent_id=None,
+            sender_name=ticket.customer_name,  # ФИО отправителя = имя клиента
             customer_name=ticket.customer_name,
             customer_email=ticket.customer_email,
             subject=ticket.subject,
@@ -428,6 +429,45 @@ class TicketService:
                     new_value="true",
                     comment="Ticket archived (delete endpoint)",
                 )
+
+        if commit:
+            self.session.commit()
+        else:
+            self.session.flush()
+
+        return DeleteResponse(success=True, deleted_id=ticket_id)
+
+    def hard_delete_ticket(
+        self,
+        *,
+        ticket_id: int,
+        agent_id: int | None,
+        commit: bool = True,
+    ) -> DeleteResponse:
+        """
+        Полное удаление тикета со всеми связанными данными:
+        - Сообщения
+        - События тикета
+        - Сам тикет
+        Вложения остаются в системе (но становятся недоступными).
+        """
+        ticket = self.session.query(Ticket).filter(Ticket.id == ticket_id).one_or_none()
+        if ticket is None:
+            return DeleteResponse(success=False, deleted_id=None, detail="Ticket not found")
+
+        # Получаем все сообщения тикета
+        messages = self.session.query(Message).filter(Message.ticket_id == ticket_id).all()
+        message_ids = [m.id for m in messages]
+
+        # Удаляем сообщения (вложения остаются, но становятся недоступными)
+        if message_ids:
+            self.session.query(Message).filter(Message.id.in_(message_ids)).delete(synchronize_session=False)
+        
+        # Удаляем события тикета
+        self.session.query(TicketEvent).filter(TicketEvent.ticket_id == ticket_id).delete(synchronize_session=False)
+        
+        # Удаляем сам тикет
+        self.session.delete(ticket)
 
         if commit:
             self.session.commit()

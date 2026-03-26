@@ -11,9 +11,11 @@ from app.core.auth import (
     check_agent_view,
     check_can_del_tickets,
     check_can_edit_tickets,
+    check_can_hard_del_tickets,
     check_can_reply_tickets,
     check_can_view_tickets,
     get_current_agent,
+    get_current_agent_optional,
     require_permission,
 )
 from app.models import get_db
@@ -40,12 +42,184 @@ from ..utils import _ticket_filters
 router = APIRouter(prefix="", tags=["tickets-admin"])
 
 
+@router.get("/tickets/create", response_class=HTMLResponse)
+def create_ticket_form(
+    request: Request,
+    agent: AgentRead = Depends(check_can_edit_tickets),
+    db: Session = Depends(get_db),
+):
+    """Форма создания тикета оператором."""
+    dept_service = DepartmentService(db)
+    cat_service = QuestionCategoryService(db)
+    departments = dept_service.list(filters={"is_active": True}, sort_by="name", limit=200)
+    categories = cat_service.list(filters={"is_active": True}, sort_by="sort_order", limit=200)
+    
+    return templates.TemplateResponse(
+        "tickets/create.html",
+        {
+            "request": request,
+            "agent": agent,
+            "departments": departments,
+            "categories": categories,
+        },
+    )
+
+
+@router.post("/tickets/create", response_class=RedirectResponse)
+async def create_ticket_submit(
+    request: Request,
+    agent: AgentRead = Depends(check_can_edit_tickets),
+    db: Session = Depends(get_db),
+    customer_name: str = Form(...),
+    customer_email: str = Form(...),
+    subject: str = Form(...),
+    body: str = Form(...),
+    department_id: int = Form(...),
+    category_id: str = Form(""),
+    priority: str = Form("normal"),
+    attachments: list[UploadFile] = File(default=[]),
+):
+    """Создание тикета оператором."""
+    from app.web.jinja.routes.utils import _parse_int
+    
+    category_id_int = _parse_int(category_id) if category_id else None
+    customer_ip = request.client.host if request.client else "0.0.0.0"
+    
+    ticket_service = TicketService(db, ticket_event_service=TicketEventService(db))
+    
+    try:
+        track_id = ticket_service.generate_track_id()
+        priority_enum = Priority(priority) if priority else Priority.normal
+        
+        ticket_data = TicketCreate(
+            track_id=track_id,
+            customer_name=customer_name.strip(),
+            customer_email=customer_email.strip(),
+            customer_ip=customer_ip,
+            department_id=department_id,
+            category_id=category_id_int,
+            status_id=1,
+            priority=priority_enum,
+            subject=subject.strip(),
+            owner_id=agent.id,  # Назначаем на создавшего оператора
+        )
+        
+        ticket, message = ticket_service.create_ticket_with_first_message(
+            ticket_data=ticket_data,
+            first_message_body=body.strip(),
+        )
+        
+        # Логируем создание
+        client_info = get_client_info(request)
+        log_service = AuditLogService(db)
+        log_service.log_action(
+            action="create",
+            entity_type="ticket",
+            entity_id=ticket.id,
+            agent_id=agent.id,
+            details={
+                "track_id": ticket.track_id,
+                "subject": ticket.subject,
+                "customer_name": ticket.customer_name,
+                "created_by_agent": True,
+            },
+            **client_info,
+        )
+        
+        # Flash-сообщение
+        request.session["flash_success"] = f"Тикет {ticket.track_id} успешно создан!"
+        
+    except Exception as e:
+        request.session["flash_error"] = f"Ошибка при создании: {str(e)}"
+    
+    return RedirectResponse(url="/tickets", status_code=303)
+
+
+@router.get("/tickets/my", response_class=HTMLResponse)
+def tickets_my(
+    request: Request,
+    agent: AgentRead = Depends(get_current_agent),  # Просто авторизация, без проверки прав
+    db: Session = Depends(get_db),
+    status_id: str | None = Query(None),  # Строка для обработки пустой строки
+    category_id: str | None = Query(None),  # Строка для обработки пустой строки
+    sort_by: str = Query("id", description="Sort field"),
+    sort_desc: bool = Query(False, description="Sort descending"),
+    limit: int = Query(50, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    archived: str = Query("active", description="Filter by archived: active, archived, all"),
+):
+    """Тикеты, назначенные текущему агенту."""
+    ticket_service = TicketService(db)
+    category_service = QuestionCategoryService(db)
+    status_service = TicketStatusService(db)
+    agent_service = AgentService(db)
+
+    # Фильтр: только тикеты, назначенные текущему агенту
+    filters = {"owner_id": agent.id}
+
+    # Преобразуем пустые строки в None
+    status_id_int = int(status_id) if status_id and status_id.strip() else None
+    category_id_int = int(category_id) if category_id and category_id.strip() else None
+
+    # Дополнительные фильтры
+    if status_id_int:
+        filters["status_id"] = status_id_int
+    if category_id_int:
+        filters["category_id"] = category_id_int
+
+    # Фильтр по архиву
+    if archived == "active":
+        filters["is_archived"] = False
+    elif archived == "archived":
+        filters["is_archived"] = True
+
+    tickets = ticket_service.list(
+        filters=filters,
+        sort_by=sort_by,
+        sort_desc=sort_desc,
+        limit=limit,
+        offset=offset,
+    )
+    categories = category_service.list(limit=500)
+    statuses = status_service.list(limit=200)
+    agents = agent_service.list(filters={"is_active": True}, sort_by="full_name", limit=500)
+    category_name_by_id = {c.id: c.name for c in categories}
+    status_name_by_id = {s.id: s.name for s in statuses}
+
+    # Получаем общее количество (используем list с большим лимитом)
+    all_tickets = ticket_service.list(filters=filters, limit=999999)
+    total_count = len(all_tickets)
+
+    return templates.TemplateResponse(
+        "tickets/my.html",
+        {
+            "request": request,
+            "agent": agent,
+            "tickets": tickets,
+            "category_name_by_id": category_name_by_id,
+            "status_name_by_id": status_name_by_id,
+            "statuses": statuses,
+            "categories": categories,
+            "agents": agents,
+            "sort_by": sort_by,
+            "sort_desc": sort_desc,
+            "limit": limit,
+            "offset": offset,
+            "archived_filter": archived,
+            "total_count": total_count,
+            **agent.get_permissions_dict(),
+        },
+    )
+
+
 @router.get("/tickets", response_class=HTMLResponse)
 def tickets_list(
     request: Request,
     agent: AgentRead = Depends(check_can_view_tickets),
     db: Session = Depends(get_db),
     q: str = Query("", description="Quick search by track_id/subject/customer"),
+    status_id: str | None = Query(None),  # Строка для обработки пустой строки
+    category_id: str | None = Query(None),  # Строка для обработки пустой строки
     sort_by: str = Query("id", description="Sort field"),
     sort_desc: bool = Query(False, description="Sort descending"),
     limit: int = Query(50, ge=1, le=500),
@@ -55,7 +229,18 @@ def tickets_list(
     ticket_service = TicketService(db)
     category_service = QuestionCategoryService(db)
     status_service = TicketStatusService(db)
+    agent_service = AgentService(db)
     filters = _ticket_filters(request)
+    
+    # Преобразуем пустые строки в None
+    status_id_int = int(status_id) if status_id and status_id.strip() else None
+    category_id_int = int(category_id) if category_id and category_id.strip() else None
+    
+    if status_id_int:
+        filters["status_id"] = status_id_int
+    if category_id_int:
+        filters["category_id"] = category_id_int
+    
     if q and not any(filters.get(k) for k in ("track_id", "subject", "customer_name", "customer_email")):
         filters["track_id"] = q.strip()
 
@@ -66,6 +251,9 @@ def tickets_list(
         filters["is_archived"] = True
     # если archived == "all" — не добавляем фильтр
 
+    # В "/tickets" показываем все тикеты (без фильтра по owner_id)
+    # Фильтр по owner_id только в "/tickets/my"
+
     tickets = ticket_service.list(
         filters=filters if filters else None,
         sort_by=sort_by,
@@ -75,6 +263,7 @@ def tickets_list(
     )
     categories = category_service.list(limit=500)
     statuses = status_service.list(limit=200)
+    agents = agent_service.list(filters={"is_active": True}, sort_by="full_name", limit=500)
     category_name_by_id = {c.id: c.name for c in categories}
     status_name_by_id = {s.id: s.name for s in statuses}
 
@@ -86,6 +275,7 @@ def tickets_list(
             "agent": agent,
             "categories": categories,
             "statuses": statuses,
+            "agents": agents,
             "category_name_by_id": category_name_by_id,
             "status_name_by_id": status_name_by_id,
             "filters": filters,
@@ -370,6 +560,41 @@ async def delete_ticket(
     return RedirectResponse(url="/tickets", status_code=303)
 
 
+@router.post("/tickets/{ticket_id}/hard-delete")
+async def hard_delete_ticket(
+    request: Request,
+    ticket_id: int,
+    db: Session = Depends(get_db),
+    agent: AgentRead = Depends(check_can_hard_del_tickets),
+):
+    """Полное удаление тикета со всеми сообщениями и вложениями."""
+    ticket_service = TicketService(db)
+    result = ticket_service.hard_delete_ticket(
+        ticket_id=ticket_id,
+        agent_id=agent.id,
+    )
+
+    if not result.success:
+        raise HTTPException(status_code=404, detail=result.detail or "Тикет не найден")
+
+    # Логируем полное удаление тикета
+    client_info = get_client_info(request)
+    log_service = AuditLogService(db)
+    log_service.log_action(
+        action="delete",
+        entity_type="ticket",
+        entity_id=ticket_id,
+        agent_id=agent.id,
+        details={"deleted_by": agent.full_name, "hard_delete": True},
+        **client_info,
+    )
+    
+    # Flash-сообщение
+    request.session["flash_success"] = "Тикет полностью удалён!"
+
+    return RedirectResponse(url="/tickets", status_code=303)
+
+
 @router.post("/tickets/{ticket_id}/restore", response_class=RedirectResponse)
 def restore_ticket(
     ticket_id: int,
@@ -401,6 +626,155 @@ def restore_ticket(
         raise HTTPException(status_code=404, detail="Тикет не найден")
 
     return RedirectResponse(url=f"/tickets/{ticket_id}", status_code=303)
+
+
+@router.post("/tickets/bulk-operation", response_class=RedirectResponse)
+async def tickets_bulk_operation(
+    request: Request,
+    agent: AgentRead = Depends(check_can_edit_tickets),
+    db: Session = Depends(get_db),
+    ticket_ids: str = Form(...),  # JSON array of ticket IDs
+    operation: str = Form(...),  # archive, delete, assign, change_status
+    owner_id: int | None = Form(None),
+    status_id: int | None = Form(None),
+):
+    """Массовые операции с тикетами."""
+    import json
+
+    ticket_service = TicketService(db, ticket_event_service=TicketEventService(db))
+
+    try:
+        ids = json.loads(ticket_ids)
+        if not isinstance(ids, list) or not all(isinstance(i, int) for i in ids):
+            raise ValueError("Invalid ticket IDs")
+    except (json.JSONDecodeError, ValueError):
+        request.session["flash_error"] = "Неверный формат данных"
+        return RedirectResponse(url="/tickets", status_code=303)
+
+    success_count = 0
+    error_count = 0
+
+    for ticket_id in ids:
+        try:
+            ticket = ticket_service.get(ticket_id=ticket_id)
+            if not ticket:
+                error_count += 1
+                continue
+
+            # Админ может всё, операторы только с can_edit_tickets
+            # (проверка уже была в Depends(check_can_edit_tickets))
+
+            if operation == 'archive':
+                ticket_service.update_ticket(
+                    ticket_id=ticket_id,
+                    ticket_data=TicketUpdate(is_archived=True),
+                    agent_id=agent.id,
+                )
+                success_count += 1
+                
+                # Логируем архивирование
+                client_info = get_client_info(request)
+                log_service = AuditLogService(db)
+                log_service.log_action(
+                    action="update",
+                    entity_type="ticket",
+                    entity_id=ticket_id,
+                    agent_id=agent.id,
+                    details={"bulk_operation": "archive", "track_id": ticket.track_id},
+                    **client_info,
+                )
+
+            elif operation == 'delete':
+                if agent.has_permission('can_hard_del_tickets') or agent.role == 'admin':
+                    ticket_service.hard_delete_ticket(
+                        ticket_id=ticket_id,
+                        agent_id=agent.id,
+                    )
+                    success_count += 1
+                    
+                    # Логируем удаление
+                    client_info = get_client_info(request)
+                    log_service = AuditLogService(db)
+                    log_service.log_action(
+                        action="delete",
+                        entity_type="ticket",
+                        entity_id=ticket_id,
+                        agent_id=agent.id,
+                        details={"bulk_operation": "hard_delete", "track_id": ticket.track_id},
+                        **client_info,
+                    )
+                else:
+                    # Архивирование вместо удаления
+                    ticket_service.update_ticket(
+                        ticket_id=ticket_id,
+                        ticket_data=TicketUpdate(is_archived=True),
+                        agent_id=agent.id,
+                    )
+                    success_count += 1
+                    
+                    # Логируем архивирование
+                    client_info = get_client_info(request)
+                    log_service = AuditLogService(db)
+                    log_service.log_action(
+                        action="update",
+                        entity_type="ticket",
+                        entity_id=ticket_id,
+                        agent_id=agent.id,
+                        details={"bulk_operation": "archive_fallback", "track_id": ticket.track_id},
+                        **client_info,
+                    )
+
+            elif operation == 'assign' and owner_id:
+                ticket_service.update_ticket(
+                    ticket_id=ticket_id,
+                    ticket_data=TicketUpdate(owner_id=owner_id),
+                    agent_id=agent.id,
+                )
+                success_count += 1
+                
+                # Логируем назначение
+                client_info = get_client_info(request)
+                log_service = AuditLogService(db)
+                log_service.log_action(
+                    action="update",
+                    entity_type="ticket",
+                    entity_id=ticket_id,
+                    agent_id=agent.id,
+                    details={"bulk_operation": "assign", "track_id": ticket.track_id, "new_owner_id": owner_id},
+                    **client_info,
+                )
+
+            elif operation == 'change_status' and status_id:
+                ticket_service.update_ticket(
+                    ticket_id=ticket_id,
+                    ticket_data=TicketUpdate(status_id=status_id),
+                    agent_id=agent.id,
+                )
+                success_count += 1
+                
+                # Логируем изменение статуса
+                client_info = get_client_info(request)
+                log_service = AuditLogService(db)
+                log_service.log_action(
+                    action="update",
+                    entity_type="ticket",
+                    entity_id=ticket_id,
+                    agent_id=agent.id,
+                    details={"bulk_operation": "change_status", "track_id": ticket.track_id, "new_status_id": status_id},
+                    **client_info,
+                )
+
+        except Exception as e:
+            error_count += 1
+            print(f"Error processing ticket {ticket_id}: {e}")
+
+    # Flash-сообщение
+    if success_count > 0:
+        request.session["flash_success"] = f"Обработано тикетов: {success_count}"
+    if error_count > 0:
+        request.session["flash_error"] = f"Ошибок: {error_count}"
+
+    return RedirectResponse(url="/tickets", status_code=303)
 
 
 @router.get("/attachments/{attachment_id}/download")

@@ -5,6 +5,7 @@ class Permission(str, Enum):
     can_view_tickets = "can_view_tickets"
     can_reply_tickets = "can_reply_tickets"
     can_del_tickets = "can_del_tickets"
+    can_hard_del_tickets = "can_hard_del_tickets"  # Полное удаление тикетов
     can_edit_tickets = "can_edit_tickets"
     can_merge_tickets = "can_merge_tickets"
     can_resolve = "can_resolve"
@@ -52,7 +53,8 @@ ALL_PERMISSIONS = list(Permission)
 PERMISSION_LABELS = {
     Permission.can_view_tickets: "Просмотр тикетов",
     Permission.can_reply_tickets: "Ответ на тикеты",
-    Permission.can_del_tickets: "Удаление тикетов",
+    Permission.can_del_tickets: "Удаление тикетов (архив)",
+    Permission.can_hard_del_tickets: "Полное удаление тикетов",
     Permission.can_edit_tickets: "Редактирование тикетов",
     Permission.can_merge_tickets: "Объединение тикетов",
     Permission.can_resolve: "Закрытие (решение) тикетов",
@@ -157,6 +159,8 @@ DEFAULT_OPERATOR_PERMISSIONS = [
     Permission.can_view_tickets,
     Permission.can_reply_tickets,
     Permission.can_edit_tickets,
+    Permission.can_del_tickets,  # Архивирование
+    Permission.can_hard_del_tickets,  # Полное удаление
     Permission.can_resolve,
     Permission.can_assign_self,
     Permission.can_view_ass_others,

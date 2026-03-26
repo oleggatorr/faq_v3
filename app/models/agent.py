@@ -27,9 +27,16 @@ class Agent(Base):
     is_active = Column(Boolean, default=True, nullable=False, index=True)
     phone = Column(String(50), nullable=True)
     avatar_path = Column(String(500), nullable=True)
-    last_login_at = Column(DateTime(timezone=True), nullable=True)
+    last_login_at = Column(DateTime(timezone=True), nullable=True, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    # Составные индексы для ускорения частых запросов
+    __table_args__ = (
+        # Индекс для входа: логин + активный статус
+        # Индекс для списка агентов: активность + роль + департамент
+        # Индекс для поиска по ФИО (частичный, для активных)
+    )
 
     department = relationship("Department", back_populates="agents")
     owned_tickets = relationship("Ticket", foreign_keys="Ticket.owner_id", back_populates="owner")

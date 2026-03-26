@@ -3,6 +3,46 @@
 {% block title %}Тикет {{ ticket.track_id }}{% endblock %}
 
 {% block content %}
+<style>
+  .control-card {
+    background: #f9f9f9;
+  }
+  .control-card strong {
+    display: block;
+    margin-bottom: 10px;
+    font-size: 1.1em;
+  }
+  .form-control {
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 14px;
+  }
+  .btn-sm {
+    padding: 6px 12px;
+    font-size: 13px;
+  }
+  .btn-success {
+    background: #28a745;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  .btn-success:hover {
+    background: #218838;
+  }
+  /* Внутренняя заметка */
+  textarea[style*="background: #fffbea"] {
+    border: 2px solid #ffc107;
+  }
+  .internal-note-summary {
+    background: #fff3cd;
+    padding: 5px 10px;
+    border-radius: 4px;
+  }
+</style>
 {% if error %}
   <p class="error">{{ error }}</p>
 {% elif ticket %}
@@ -12,7 +52,15 @@
     <h1>Тикет #{{ ticket.id }} <small>({{ ticket.track_id }})</small></h1>
     <p><strong>Тема:</strong> {{ ticket.subject }}</p>
     <p><strong>Заявитель:</strong> {{ ticket.customer_name }} &lt;{{ ticket.customer_email }}&gt;</p>
-    
+    <p>
+      <strong>Исполнитель:</strong>
+      {% if ticket.owner_id %}
+        <span class="badge bg-info">{{ agent_name_by_id.get(ticket.owner_id, 'Неизвестно') }}</span>
+      {% else %}
+        <span class="badge bg-secondary">⚠️ Оператор не назначен</span>
+      {% endif %}
+    </p>
+
     <!-- Быстрая панель статусов -->
     <div class="ticket-meta">
       <span class="badge status-{{ ticket.status_id }}">Статус: {{ status_name_by_id.get(ticket.status_id, ticket.status_id) }}</span>
@@ -31,7 +79,7 @@
         <!-- Кнопка удаления тикета -->
         {% if can_del_tickets %}
         <form method="post" action="/tickets/{{ ticket.id }}/delete" style="display: inline;"
-              onsubmit="return confirm('⚠️ Вы уверены, что хотите удалить тикет #{{ ticket.id }}? Это действие нельзя отменить.');">
+              onsubmit="return confirm('⚠️ Вы уверены, что хотите удалить тикет  {{ ticket.track_id }}  ? ');">
           <button type="submit" class="btn-danger" onclick="event.stopPropagation();">🗑️ Удалить тикет</button>
         </form>
         {% endif %}
@@ -39,93 +87,124 @@
     </div>
   </div>
 
-  <!-- Форма: Ответ / Внутренняя заметка -->
+  <!-- Форма: Ответ клиенту -->
   {% if can_reply_tickets %}
   <details class="admin-panel" open>
-    <summary><strong>✍️ Написать ответ</strong></summary>
+    <summary><strong>✉️ Ответ клиенту</strong></summary>
     <form method="post" action="/tickets/{{ ticket.id }}/reply" enctype="multipart/form-data" class="mt-2">
       <p>
-        <label>Текст сообщения:<br>
-          <textarea name="body" rows="5" cols="70" required placeholder="Введите ответ..."></textarea>
-        </label>
-      </p>
-      <p>
-        <label>
-          <input type="checkbox" name="is_internal" value="true" />
-          <strong>Внутренняя заметка</strong> (не видна клиенту)
+        <label>Текст ответа:<br>
+          <textarea name="body" rows="5" cols="70" required placeholder="Введите ответ для клиента..."></textarea>
         </label>
       </p>
       <p>
         <label>Вложения: <input type="file" name="attachments" multiple /></label>
       </p>
-      <button type="submit" class="btn-primary">Отправить</button>
+      <button type="submit" class="btn-primary">Отправить клиенту</button>
     </form>
   </details>
   {% endif %}
 
-  <!-- Форма: Изменить параметры тикета -->
-  {% if can_edit_tickets %}
+  <!-- Форма: Внутренняя заметка -->
+  {% if can_reply_tickets %}
   <details class="admin-panel">
-    <summary><strong>⚙️ Параметры тикета</strong></summary>
-    <form method="post" action="/tickets/{{ ticket.id }}/update" class="mt-2 grid-form">
-      <div class="form-row">
-        <label>
-          Статус:
-          <select name="status_id">
-            <option value="">— не менять —</option>
+    <summary class="internal-note-summary"><strong>📝 Внутренняя заметка</strong> <small style="color: #666;">(не видна клиенту)</small></summary>
+    <form method="post" action="/tickets/{{ ticket.id }}/reply" enctype="multipart/form-data" class="mt-2">
+      <input type="hidden" name="is_internal" value="true" />
+      <p>
+        <label>Текст заметки:<br>
+          <textarea name="body" rows="4" cols="70" required placeholder="Внутренняя заметка для операторов..." style="background: #fffbea;"></textarea>
+        </label>
+      </p>
+      <p>
+        <label>Вложения: <input type="file" name="attachments" multiple /></label>
+      </p>
+      <button type="submit" class="btn-secondary">Добавить заметку</button>
+    </form>
+  </details>
+  {% endif %}
+
+  <!-- Панель управления тикетом -->
+  {% if can_edit_tickets %}
+  <details class="admin-panel" open>
+    <summary><strong>🎛️ Управление тикетом</strong></summary>
+    <div class="mt-2" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px;">
+      
+      <!-- Изменить статус -->
+      <div class="control-card" style="border: 1px solid #ddd; padding: 15px; border-radius: 5px;">
+        <strong>📊 Статус</strong>
+        <form method="post" action="/tickets/{{ ticket.id }}/update" class="mt-2">
+          <select name="status_id" class="form-control" style="width: 100%; margin-bottom: 10px;">
             {% for s in statuses %}
               <option value="{{ s.id }}" {% if s.id == ticket.status_id %}selected{% endif %}>
                 {{ s.name }}
               </option>
             {% endfor %}
           </select>
-        </label>
+          <button type="submit" class="btn-primary btn-sm">Подтвердить</button>
+        </form>
+      </div>
 
-        <label>
-          Приоритет:
-          <select name="priority">
-            <option value="">— не менять —</option>
+      <!-- Изменить приоритет -->
+      <div class="control-card" style="border: 1px solid #ddd; padding: 15px; border-radius: 5px;">
+        <strong>⚡ Приоритет</strong>
+        <form method="post" action="/tickets/{{ ticket.id }}/update" class="mt-2">
+          <select name="priority" class="form-control" style="width: 100%; margin-bottom: 10px;">
             {% for p in priorities %}
               <option value="{{ p.value }}" {% if p.value == ticket.priority.value %}selected{% endif %}>
                 {{ p.value }}
               </option>
             {% endfor %}
           </select>
-        </label>
+          <button type="submit" class="btn-primary btn-sm">Подтвердить</button>
+        </form>
+      </div>
 
-        <label>
-          Исполнитель:
-          <select name="owner_id">
-            <option value="0">— снять назначение —</option>
-            <!-- Здесь можно подгрузить список агентов через context -->
-            {% for a in agents|default([]) %}
-              <option value="{{ a.id }}" {% if a.id == ticket.owner_id %}selected{% endif %}>
-                {{ a.full_name }} ({{ a.email }})
-              </option>
-            {% endfor %}
-          </select>
-        </label>
-
-        <label>
-          Категория:
-          <select name="category_id">
-            <option value="0">— не менять —</option>
+      <!-- Переместить в департамент -->
+      <div class="control-card" style="border: 1px solid #ddd; padding: 15px; border-radius: 5px;">
+        <strong>🏢 Департамент</strong>
+        <form method="post" action="/tickets/{{ ticket.id }}/update" class="mt-2">
+          <select name="category_id" class="form-control" style="width: 100%; margin-bottom: 10px;">
+            <option value="">— не менять —</option>
             {% for c in categories|default([]) %}
               <option value="{{ c.id }}" {% if c.id == ticket.category_id %}selected{% endif %}>
                 {{ c.name }}
               </option>
             {% endfor %}
           </select>
-        </label>
+          <button type="submit" class="btn-primary btn-sm">Подтвердить</button>
+        </form>
       </div>
 
-      <div class="form-row checkboxes">
-        <label><input type="checkbox" name="is_locked" value="true" {% if ticket.is_locked %}checked{% endif %}> 🔒 Заблокировать</label>
-        <label><input type="checkbox" name="is_archived" value="true" {% if ticket.is_archived %}checked{% endif %}> 📦 В архив</label>
+      <!-- Назначить исполнителя -->
+      <div class="control-card" style="border: 1px solid #ddd; padding: 15px; border-radius: 5px;">
+        <strong>👤 Исполнитель</strong>
+        <form method="post" action="/tickets/{{ ticket.id }}/update" class="mt-2">
+          <select name="owner_id" class="form-control" style="width: 100%; margin-bottom: 10px;">
+            <option value="0">— снять назначение —</option>
+            {% for a in agents|default([]) %}
+              <option value="{{ a.id }}" {% if a.id == ticket.owner_id %}selected{% endif %}>
+                {{ a.full_name }}
+              </option>
+            {% endfor %}
+          </select>
+          <button type="submit" class="btn-primary btn-sm">Подтвердить</button>
+        </form>
       </div>
 
-      <button type="submit" class="btn-secondary">Сохранить изменения</button>
-    </form>
+      <!-- Назначить себе -->
+      <div class="control-card" style="border: 1px solid #ddd; padding: 15px; border-radius: 5px;">
+        <strong>👈 Назначить себе</strong>
+        <form method="post" action="/tickets/{{ ticket.id }}/update" class="mt-2">
+          <p style="font-size: 0.9em; color: #666; margin-bottom: 10px;">
+            Назначить тикет на себя
+          </p>
+          <input type="hidden" name="owner_id" value="{{ agent.id }}" />
+          <button type="submit" class="btn-success btn-sm">Назначить себе</button>
+        </form>
+      </div>
+
+    </div>
   </details>
   {% endif %}
 

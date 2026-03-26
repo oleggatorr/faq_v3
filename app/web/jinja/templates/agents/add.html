@@ -55,12 +55,12 @@
 
   <hr>
 
-  <!-- Департаменты -->
+  <!-- Категории вопросов -->
   <div id="category_block">
-    <label>Доступ к департаментам:</label><br>
-    {% for d in departments %}
-      <input type="checkbox" name="category_access" value="{{ d.id }}">
-      {{ d.name }}<br>
+    <label>Доступ к категориям вопросов:</label><br>
+    {% for cat in categories %}
+      <input type="checkbox" name="category_access" value="{{ cat.id }}">
+      {{ cat.name }}<br>
     {% endfor %}
   </div>
 

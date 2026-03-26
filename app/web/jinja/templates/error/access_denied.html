@@ -21,13 +21,13 @@
           <div class="mt-4">
             <a href="/" class="btn btn-primary">🏠 На главную</a>
             {% if agent %}
-              {% if can_view_tickets %}
+              {% if view_tickets %}
                 <a href="/tickets" class="btn btn-outline-secondary">📋 Тикеты</a>
               {% endif %}
-              {% if can_agent_view %}
+              {% if agent_view %}
                 <a href="/agents" class="btn btn-outline-secondary">👥 Операторы</a>
               {% endif %}
-              {% if can_audit_logs_view %}
+              {% if audit_logs_view %}
                 <a href="/logs" class="btn btn-outline-secondary">📊 Логи</a>
               {% endif %}
             {% endif %}

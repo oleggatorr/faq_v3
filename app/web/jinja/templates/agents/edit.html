@@ -72,22 +72,22 @@
 
   <!-- Статус -->
   <div class="mb-3 form-check">
-    <input type="checkbox" name="is_active" class="form-check-input" id="is_active" 
+    <input type="checkbox" name="is_active" class="form-check-input" id="is_active"
            {% if target_agent.is_active %}checked{% endif %}>
     <label class="form-check-label" for="is_active">Активен</label>
   </div>
 
   <hr>
 
-  <!-- Доступ к департаментам -->
+  <!-- Доступ к категориям вопросов -->
   <div id="category_block" {% if target_agent.role == 'admin' %}style="display:none"{% endif %}>
-    <label class="form-label">Доступ к департаментам:</label><br>
-    {% for d in departments %}
+    <label class="form-label">Доступ к категориям вопросов:</label><br>
+    {% for cat in categories %}
       <div class="form-check">
-        <input type="checkbox" name="category_access" class="form-check-input" 
-               id="cat_{{ d.id }}" value="{{ d.id }}"
-               {% if d.id|string in selected_categories %}checked{% endif %}>
-        <label class="form-check-label" for="cat_{{ d.id }}">{{ d.name }}</label>
+        <input type="checkbox" name="category_access" class="form-check-input"
+               id="cat_{{ cat.id }}" value="{{ cat.id }}"
+               {% if cat.id|string in selected_categories %}checked{% endif %}>
+        <label class="form-check-label" for="cat_{{ cat.id }}">{{ cat.name }}</label>
       </div>
     {% endfor %}
   </div>

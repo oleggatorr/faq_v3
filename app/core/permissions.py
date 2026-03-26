@@ -161,6 +161,8 @@ DEFAULT_OPERATOR_PERMISSIONS = [
     Permission.can_assign_self,
     Permission.can_view_ass_others,
     Permission.agent_view,
+    Permission.agent_edit,
+    Permission.agent_delete,
 ]
 
 

@@ -13,17 +13,17 @@ class Agent(Base):
     __tablename__ = "agents"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    full_name = Column(String(200), nullable=False)
+    full_name = Column(String(200), nullable=False, index=True)
     email = Column(String(255), unique=True, nullable=False, index=True)
     login = Column(String(100), unique=True, nullable=False, index=True)
     password_hash = Column(String(255), nullable=False)
-    role = Column(SQLEnum(AgentRole), nullable=False, default=AgentRole.operator)
+    role = Column(SQLEnum(AgentRole), nullable=False, default=AgentRole.operator, index=True)
 
     category_access = Column(Text, nullable=False, default="")
     permissions = Column(Text, nullable=False, default="")
-    
+
     department_id = Column(Integer, ForeignKey("departments.id", ondelete="SET NULL", onupdate="CASCADE"), nullable=True, index=True)
-    
+
     is_active = Column(Boolean, default=True, nullable=False, index=True)
     phone = Column(String(50), nullable=True)
     avatar_path = Column(String(500), nullable=True)

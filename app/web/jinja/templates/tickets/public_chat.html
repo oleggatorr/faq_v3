@@ -8,6 +8,18 @@
   {% elif ticket %}
     <h1>Обращение {{ ticket.track_id }}</h1>
     <p><strong>Тема:</strong> {{ ticket.subject }}</p>
+    
+    <!-- Статус и приоритет -->
+    <p>
+      <strong>Статус:</strong>
+      <span class="badge" style="background: #007bff; color: white; padding: 4px 8px; border-radius: 4px;">
+        {{ status_name_by_id.get(ticket.status_id, ticket.status_id) }}
+      </span>
+      <strong style="margin-left: 15px;">Приоритет:</strong>
+      <span class="badge" style="background: #6c757d; color: white; padding: 4px 8px; border-radius: 4px;">
+        {{ ticket.priority.value }}
+      </span>
+    </p>
 
     <hr />
     <h2>Написать сообщение</h2>
@@ -28,7 +40,16 @@
     {% if messages %}
       {% for msg in messages %}
         <div style="padding: 8px; border: 1px solid #ddd; margin-bottom: 8px;">
-          <p><small>{{ msg.created_at.strftime('%d.%m.%Y %H:%M') }}</small></p>
+          <p>
+            <small>
+              {{ msg.created_at.strftime('%d.%m.%Y %H:%M') }}
+              {% if msg.agent_id %}
+                | <strong>Оператор:</strong> {{ agent_login_by_id.get(msg.agent_id, 'Неизвестно') }}
+              {% else %}
+                | <strong>Клиент</strong>
+              {% endif %}
+            </small>
+          </p>
           <p>{{ msg.body }}</p>
           {% set msg_attachments = attachments_by_message.get(msg.id, []) %}
           {% if msg_attachments %}

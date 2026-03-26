@@ -28,16 +28,6 @@
       </label>
     </p>
     <p>
-      <label>Язык:
-        <select name="language_id">
-          <option value="">— Не указан —</option>
-          {% for lang in languages %}
-            <option value="{{ lang.id }}" {% if form_data.language_id == lang.id %}selected{% endif %}>{{ lang.name }} ({{ lang.code }})</option>
-          {% endfor %}
-        </select>
-      </label>
-    </p>
-    <p>
       <label>Категория:
         <select name="category_id">
           <option value="">— Не указана —</option>
@@ -47,15 +37,9 @@
         </select>
       </label>
     </p>
-    <p>
-      <label>Приоритет:
-        <select name="priority">
-          {% for p in priorities %}
-            <option value="{{ p.value }}" {% if (form_data.priority or 'normal') == p.value %}selected{% endif %}>{{ p.value }}</option>
-          {% endfor %}
-        </select>
-      </label>
-    </p>
+    <!-- Скрытые поля: Язык (русский) и Приоритет (normal) -->
+    <input type="hidden" name="language_id" value="{{ languages|selectattr('code', 'equalto', 'ru')|map(attribute='id')|first|default('') }}" />
+    <input type="hidden" name="priority" value="normal" />
     <p>
       <label>Сообщение:<br />
         <textarea name="body" rows="8" cols="60" required>{{ form_data.body or '' }}</textarea>

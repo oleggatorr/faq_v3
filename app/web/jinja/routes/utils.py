@@ -59,12 +59,12 @@ def _agent_filters(request: Request) -> dict[str, Any]:
     filters: dict[str, Any] = {}
     if _parse_int(params.get("id")) is not None:
         filters["id"] = _parse_int(params.get("id"))
-    if params.get("full_name"):
-        filters["full_name"] = params["full_name"]
-    if params.get("email"):
-        filters["email"] = params["email"]
-    if _parse_int(params.get("department_id")) is not None:
-        filters["department_id"] = _parse_int(params.get("department_id"))
+    if params.get("search"):
+        filters["search"] = params["search"]
+    if params.get("role"):
+        filters["role"] = params["role"]
+    if _parse_int(params.get("category_id")) is not None:
+        filters["category_id"] = _parse_int(params.get("category_id"))
     val = _parse_bool(params.get("is_active"))
     if val is not None:
         filters["is_active"] = val

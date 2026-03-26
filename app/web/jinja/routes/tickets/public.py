@@ -154,6 +154,22 @@ def ticket_messages_by_track_id(
             limit=50,
         )
 
+    # Получаем справочники для отображения
+    from app.models.ticket_status import TicketStatus
+    from app.models.ticket import Priority
+    from app.services.ticket_status_service import TicketStatusService
+    
+    status_service = TicketStatusService(db)
+    statuses = status_service.list(sort_by="sort_order", limit=200)
+    status_name_by_id = {s.id: s.name for s in statuses}
+    priorities = list(Priority)
+    
+    # Получаем агентов для отображения логина
+    from app.services.agent_service import AgentService
+    agent_service = AgentService(db)
+    agents = agent_service.list(filters={"is_active": True}, sort_by="full_name", limit=500)
+    agent_login_by_id = {a.id: a.login for a in agents}
+
     return templates.TemplateResponse(
         "tickets/public_chat.html",
         {
@@ -163,6 +179,9 @@ def ticket_messages_by_track_id(
             "messages": messages,
             "attachments_by_message": attachments_by_message,
             "error": None,
+            "status_name_by_id": status_name_by_id,
+            "priorities": priorities,
+            "agent_login_by_id": agent_login_by_id,
         },
     )
 
@@ -284,14 +303,14 @@ async def new_ticket_submit(
     attachments: list[UploadFile] = File(default=[]),
 ):
     """Публичное создание тикета. После успеха — страница с трек-номером."""
+    from app.web.jinja.routes.utils import _parse_int
+    
     dept_service = DepartmentService(db)
     lang_service = LanguageService(db)
     cat_service = QuestionCategoryService(db)
     departments = dept_service.list(filters={"is_active": True}, sort_by="sort_order", limit=200)
     languages = lang_service.list(filters={"is_active": True}, sort_by="sort_order", limit=100)
     categories = cat_service.list(filters={"is_active": True}, sort_by="sort_order", limit=200)
-
-    from .utils import _parse_int
 
     language_id_int = _parse_int(language_id) if language_id else None
     category_id_int = _parse_int(category_id) if category_id else None

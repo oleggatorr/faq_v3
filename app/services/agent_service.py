@@ -58,6 +58,7 @@ class AgentService:
     ) -> list[AgentRead]:
         allowed_filters = {
             "id",
+            "login",
             "full_name",
             "email",
             "role",
@@ -65,9 +66,12 @@ class AgentService:
             "is_active",
             "phone",
             "last_login_at",
+            "search",  # Специальный параметр для поиска по login + full_name
+            "category_id",  # Фильтр по категории (вхождение в category_access)
         }
         allowed_sort = {
             "id",
+            "login",
             "full_name",
             "email",
             "role",
@@ -84,11 +88,33 @@ class AgentService:
                 raise ValueError(f"Unknown filter fields: {', '.join(sorted(unknown))}")
 
         query = self.session.query(Agent)
+
+        # Обработка специального параметра search (поиск по login + full_name)
+        if filters and "search" in filters:
+            search_term = filters.pop("search")
+            if search_term:
+                query = query.filter(
+                    (Agent.login.ilike(f"%{search_term}%")) |
+                    (Agent.full_name.ilike(f"%{search_term}%"))
+                )
+        
+        # Обработка фильтра по категории (вхождение в category_access)
+        if filters and "category_id" in filters:
+            category_id = filters.pop("category_id")
+            if category_id:
+                # category_access хранится как строка с ID через запятую: "1,3,5"
+                query = query.filter(
+                    (Agent.category_access.like(f"{category_id},%")) |
+                    (Agent.category_access.like(f"%,{category_id},%")) |
+                    (Agent.category_access.like(f"%,{category_id}")) |
+                    (Agent.category_access == str(category_id))
+                )
+
         query = apply_filters(
             query,
             Agent,
             filters=filters,
-            text_like_fields={"full_name", "email", "phone"},
+            text_like_fields={"full_name", "email", "phone", "login"},
         )
         query = apply_sort(query, Agent, sort_by=sort_by, sort_desc=sort_desc, allowed_sort_fields=allowed_sort)
         agents = query.offset(offset).limit(limit).all()

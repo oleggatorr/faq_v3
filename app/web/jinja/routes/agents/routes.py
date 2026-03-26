@@ -19,6 +19,7 @@ from app.core.permissions import (
 )
 from app.models import get_db
 from app.models.agent import Agent
+from app.models.question_category import QuestionCategory
 from app.schemas.agent import AgentCreate, AgentUpdate
 from app.services.agent_service import AgentService
 from app.services.audit_log_service import AuditLogService
@@ -43,6 +44,10 @@ def agents_list(
     agent_service = AgentService(db)
     filters = _agent_filters(request)
 
+    # Получаем общее количество один раз
+    total_agents = agent_service.list(filters=filters if filters else None, limit=999999)
+    
+    # Получаем страницу
     agents = agent_service.list(
         filters=filters if filters else None,
         sort_by=sort_by,
@@ -51,7 +56,10 @@ def agents_list(
         offset=offset,
     )
 
-    total = agent_service.list(filters=filters, limit=999999) if filters else agent_service.list(limit=999999)
+    # Получаем список категорий для фильтра
+    categories = db.query(QuestionCategory).filter(
+        QuestionCategory.is_active == True
+    ).order_by(QuestionCategory.name).all()
 
     return templates.TemplateResponse(
         "agents/list.html",
@@ -59,7 +67,8 @@ def agents_list(
             "request": request,
             "agents": agents,
             "agent": agent,
-            "total_count": len(total),
+            "categories": categories,
+            "total_count": len(total_agents),
             "sort_by": sort_by,
             "sort_desc": sort_desc,
             "search_query": request.query_params.get("search", ""),
@@ -76,6 +85,12 @@ def add_agent_form(
     agent: AgentRead = Depends(check_agent_create),
     db: Session = Depends(get_db),
 ):
+    # Получаем список категорий вопросов
+    categories = db.query(QuestionCategory).filter(
+        QuestionCategory.is_active == True
+    ).order_by(QuestionCategory.name).all()
+    
+    # Получаем список департаментов для основного департамента агента
     dept_service = DepartmentService(db)
     departments = dept_service.list(
         filters={"is_active": True},
@@ -88,6 +103,7 @@ def add_agent_form(
         {
             "request": request,
             "agent": agent,
+            "categories": categories,
             "departments": departments,
             "error": None,
             "permissions_list": list(Permission),
@@ -122,13 +138,23 @@ def add_agent_submit(
     
     # Проверка совпадения паролей
     if password != password_confirm:
+        categories = db.query(QuestionCategory).filter(
+            QuestionCategory.is_active == True
+        ).order_by(QuestionCategory.name).all()
         dept_service = DepartmentService(db)
+        departments = dept_service.list(
+            filters={"is_active": True},
+            sort_by="name",
+            limit=200,
+        )
         return templates.TemplateResponse(
             "agents/add.html",
             {
                 "request": request,
                 "agent": agent,
                 "error": "Пароли не совпадают",
+                "categories": categories,
+                "departments": departments,
                 "permissions_list": list(Permission),
                 "permission_labels": PERMISSION_LABELS,
                 "form_data": {
@@ -157,13 +183,23 @@ def add_agent_submit(
         error_msg = None
 
     if error_msg:
+        categories = db.query(QuestionCategory).filter(
+            QuestionCategory.is_active == True
+        ).order_by(QuestionCategory.name).all()
         dept_service = DepartmentService(db)
+        departments = dept_service.list(
+            filters={"is_active": True},
+            sort_by="name",
+            limit=200,
+        )
         return templates.TemplateResponse(
             "agents/add.html",
             {
                 "request": request,
                 "agent": agent,
                 "error": error_msg,
+                "categories": categories,
+                "departments": departments,
                 "permissions_list": list(Permission),
                 "permission_labels": PERMISSION_LABELS,
                 "form_data": {
@@ -225,13 +261,23 @@ def add_agent_submit(
         return RedirectResponse(url="/agents", status_code=303)
 
     except Exception as e:
+        categories = db.query(QuestionCategory).filter(
+            QuestionCategory.is_active == True
+        ).order_by(QuestionCategory.name).all()
         dept_service = DepartmentService(db)
+        departments = dept_service.list(
+            filters={"is_active": True},
+            sort_by="name",
+            limit=200,
+        )
         return templates.TemplateResponse(
             "agents/add.html",
             {
                 "request": request,
                 "agent": agent,
                 "error": str(e),
+                "categories": categories,
+                "departments": departments,
                 "permissions_list": list(Permission),
                 "permission_labels": PERMISSION_LABELS,
                 "form_data": {
@@ -258,10 +304,16 @@ def edit_agent_form(
     db: Session = Depends(get_db),
 ):
     agent_service = AgentService(db)
-    dept_service = DepartmentService(db)
 
     target_agent = agent_service.get(agent_id=agent_id)
 
+    # Получаем список категорий вопросов
+    categories = db.query(QuestionCategory).filter(
+        QuestionCategory.is_active == True
+    ).order_by(QuestionCategory.name).all()
+    
+    # Получаем список департаментов для основного департамента агента
+    dept_service = DepartmentService(db)
     departments = dept_service.list(
         filters={"is_active": True},
         sort_by="name",
@@ -277,6 +329,7 @@ def edit_agent_form(
             "request": request,
             "agent": agent,
             "target_agent": target_agent,
+            "categories": categories,
             "departments": departments,
             "error": None,
             "permissions_list": list(Permission),
@@ -315,7 +368,15 @@ def edit_agent_submit(
     # Проверка совпадения паролей
     if password or password_confirm:
         if password != password_confirm:
+            categories = db.query(QuestionCategory).filter(
+                QuestionCategory.is_active == True
+            ).order_by(QuestionCategory.name).all()
             dept_service = DepartmentService(db)
+            departments = dept_service.list(
+                filters={"is_active": True},
+                sort_by="name",
+                limit=200,
+            )
             target_agent = agent_service.get(agent_id=agent_id)
             return templates.TemplateResponse(
                 "agents/edit.html",
@@ -323,7 +384,8 @@ def edit_agent_submit(
                     "request": request,
                     "agent": agent,
                     "target_agent": target_agent,
-                    "departments": dept_service.list(filters={"is_active": True}, sort_by="name", limit=200),
+                    "categories": categories,
+                    "departments": departments,
                     "error": "Пароли не совпадают",
                     "permissions_list": list(Permission),
                     "permission_labels": PERMISSION_LABELS,
@@ -386,7 +448,15 @@ def edit_agent_submit(
         return RedirectResponse(url="/agents", status_code=303)
 
     except Exception as e:
+        categories = db.query(QuestionCategory).filter(
+            QuestionCategory.is_active == True
+        ).order_by(QuestionCategory.name).all()
         dept_service = DepartmentService(db)
+        departments = dept_service.list(
+            filters={"is_active": True},
+            sort_by="name",
+            limit=200,
+        )
         target_agent = agent_service.get(agent_id=agent_id)
 
         return templates.TemplateResponse(
@@ -395,7 +465,8 @@ def edit_agent_submit(
                 "request": request,
                 "agent": agent,
                 "target_agent": target_agent,
-                "departments": dept_service.list(filters={"is_active": True}, sort_by="name", limit=200),
+                "categories": categories,
+                "departments": departments,
                 "error": str(e),
                 "permissions_list": list(Permission),
                 "permission_labels": PERMISSION_LABELS,

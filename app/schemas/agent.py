@@ -82,8 +82,18 @@ class AgentRead(AgentBase):
         Вернуть dict {can_permission_name: bool} для всех прав.
         Используется для передачи в шаблоны.
         """
-        if self.role == AgentRole.admin:
-            return {f"can_{perm.value}": True for perm in Permission}
+        # Админ всегда имеет все права
+        is_admin = isinstance(self.role, AgentRole) and self.role == AgentRole.admin
         
+        if is_admin:
+            return {perm.value: True for perm in Permission}
+
         user_perms = self._get_permissions_set()
-        return {f"can_{perm.value}": perm.value in user_perms for perm in Permission}
+        return {perm.value: perm.value in user_perms for perm in Permission}
+    
+    @property
+    def role_name(self) -> str:
+        """Возвращает имя роли как строку."""
+        if isinstance(self.role, AgentRole):
+            return self.role.value
+        return str(self.role)

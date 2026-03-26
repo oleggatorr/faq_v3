@@ -18,7 +18,7 @@
           <a href="/question-category-list">Категории</a>
           {% if agent.role == 'admin' %} | <a href="/logs">Логи</a>{% endif %}
           | <a href="/accaunt">Аккаунт</a>
-          | {{ agent.full_name }} |
+          | {{ agent.login }} |
           <form method="post" action="/logout" style="display:inline;"><button type="submit">Выход</button></form>
         {% else %}
           <button type="button" class="back-btn" onclick="goBack()">← Назад</button> |

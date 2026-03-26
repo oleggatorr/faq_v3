@@ -684,6 +684,26 @@ async def tickets_bulk_operation(
                     **client_info,
                 )
 
+            elif operation == 'unarchive':
+                ticket_service.update_ticket(
+                    ticket_id=ticket_id,
+                    ticket_data=TicketUpdate(is_archived=False),
+                    agent_id=agent.id,
+                )
+                success_count += 1
+                
+                # Логируем разархивирование
+                client_info = get_client_info(request)
+                log_service = AuditLogService(db)
+                log_service.log_action(
+                    action="update",
+                    entity_type="ticket",
+                    entity_id=ticket_id,
+                    agent_id=agent.id,
+                    details={"bulk_operation": "unarchive", "track_id": ticket.track_id},
+                    **client_info,
+                )
+
             elif operation == 'delete':
                 if agent.has_permission('can_hard_del_tickets') or agent.role == 'admin':
                     ticket_service.hard_delete_ticket(

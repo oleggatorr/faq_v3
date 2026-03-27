@@ -1,44 +1,34 @@
 {% extends "base.html" %}
 
-{% block title %}Тикеты{% endblock %}
+{% block title %}Неназначенные тикеты{% endblock %}
 
 {% block content %}
 <div class="page-header">
-  <h1 class="page-title">📋 Тикеты</h1>
+  <h1 class="page-title">📥 Неназначенные тикеты</h1>
   <div>
     <a href="/new-ticket" class="btn btn-primary">
       ➕ Создать обращение
     </a>
-    <a href="/get-ticket" class="btn btn-outline-secondary ms-2">
-      🔍 Найти по треку
+    <a href="/tickets/my" class="btn btn-outline-secondary ms-2">
+      📋 Мои тикеты
+    </a>
+    <a href="/tickets/others" class="btn btn-outline-secondary ms-2">
+      👥 Чужие тикеты
     </a>
   </div>
 </div>
 
 <!-- Фильтры -->
 <div class="filters-card">
-  <form method="get" action="/tickets">
+  <form method="get" action="/tickets/unassigned">
     <div class="row g-3">
-      <!-- Поиск -->
-      <div class="col-md-4">
-        <label for="search_q" class="form-label">Поиск</label>
-        <input 
-          type="text" 
-          class="form-control" 
-          id="search_q"
-          name="q" 
-          value="{{ q or '' }}" 
-          placeholder="track_id / тема / клиент"
-        />
-      </div>
-      
       <!-- Статус -->
-      <div class="col-md-2">
+      <div class="col-md-3">
         <label for="status_id" class="form-label">Статус</label>
         <select name="status_id" id="status_id" class="form-select">
           <option value="">Все</option>
           {% for s in statuses %}
-            <option value="{{ s.id }}" {% if filters.status_id == s.id %}selected{% endif %}>
+            <option value="{{ s.id }}" {% if request.query_params.get('status_id')|int == s.id %}selected{% endif %}>
               {{ s.name }}
             </option>
           {% endfor %}
@@ -46,12 +36,12 @@
       </div>
       
       <!-- Категория -->
-      <div class="col-md-2">
+      <div class="col-md-3">
         <label for="category_id" class="form-label">Категория</label>
         <select name="category_id" id="category_id" class="form-select">
           <option value="">Все</option>
           {% for c in categories %}
-            <option value="{{ c.id }}" {% if filters.category_id == c.id %}selected{% endif %}>
+            <option value="{{ c.id }}" {% if request.query_params.get('category_id')|int == c.id %}selected{% endif %}>
               {{ c.name }}
             </option>
           {% endfor %}
@@ -59,7 +49,7 @@
       </div>
       
       <!-- Архив -->
-      <div class="col-md-2">
+      <div class="col-md-3">
         <label for="archived" class="form-label">Архив</label>
         <select name="archived" id="archived" class="form-select">
           <option value="active" {% if archived_filter == "active" %}selected{% endif %}>
@@ -75,12 +65,12 @@
       </div>
       
       <!-- Кнопки -->
-      <div class="col-md-2 d-flex align-items-end gap-2">
+      <div class="col-md-3 d-flex align-items-end gap-2">
         <button type="submit" class="btn btn-secondary flex-fill">
-          🔍 Применить
+          🔍 Фильтр
         </button>
-        <a href="/tickets" class="btn btn-outline-secondary">
-          ✕
+        <a href="/tickets/my" class="btn btn-outline-secondary">
+          ✕ Сброс
         </a>
       </div>
     </div>
@@ -97,14 +87,14 @@
           {% endfor %}
         </select>
       </div>
-
+      
       <div class="col-md-2 d-flex align-items-end">
         <div class="form-check">
-          <input
-            type="checkbox"
-            class="form-check-input"
-            name="sort_desc"
-            value="true"
+          <input 
+            type="checkbox" 
+            class="form-check-input" 
+            name="sort_desc" 
+            value="true" 
             id="sort_desc"
             {% if sort_desc %}checked{% endif %}
           />
@@ -151,9 +141,6 @@
           </button>
           <button type="button" class="btn btn-sm btn-outline-success" onclick="applyToSelected('unarchive')" title="Разархивировать">
             ♻️ Разархивировать
-          </button>
-          <button type="button" class="btn btn-sm btn-outline-danger" onclick="applyToSelected('delete')" title="Удалить">
-            🔥 Удалить
           </button>
           <button type="button" class="btn btn-sm btn-outline-success" onclick="showAssignModal()" title="Назначить">
             👤 Назначить
@@ -261,7 +248,7 @@
     </div>
   {% else %}
     <div class="alert alert-info m-3 mb-0">
-      Тикеты не найдены.
+      📭 У вас пока нет назначенных тикетов.
     </div>
   {% endif %}
 </div>
@@ -312,7 +299,7 @@ function applyToSelected(operation) {
   
   // Подтверждение для удаления
   if (operation === 'delete') {
-    if (!confirm(`⚠️ Вы уверены, что хотите удалить ${ticketIds.length} тикет(ов)?\n\nЭто действие необратимо!`)) {
+    if (!confirm(`⚠️ Вы уверены, что хотите удалить ${ticketIds.length} тикет(ов)?`)) {
       return;
     }
   }
@@ -335,42 +322,6 @@ function applyToSelected(operation) {
   opInput.name = 'operation';
   opInput.value = operation;
   form.appendChild(opInput);
-  
-  document.body.appendChild(form);
-  form.submit();
-}
-
-// Показать модальное окно назначения
-function showAssignModal() {
-  const ticketIds = getSelectedIds();
-  if (ticketIds.length === 0) {
-    alert('Выберите тикеты');
-    return;
-  }
-  
-  const modal = new bootstrap.Modal(document.getElementById('assignModal'));
-  modal.show();
-}
-
-// Применить назначение
-function applyAssign() {
-  const ticketIds = getSelectedIds();
-  const ownerId = document.getElementById('assign-owner').value;
-  
-  if (!ownerId) {
-    alert('Выберите оператора');
-    return;
-  }
-  
-  const form = document.createElement('form');
-  form.method = 'POST';
-  form.action = '/tickets/bulk-operation';
-  
-  form.innerHTML = `
-    <input type="hidden" name="ticket_ids" value='${JSON.stringify(ticketIds)}'>
-    <input type="hidden" name="operation" value="assign">
-    <input type="hidden" name="owner_id" value="${ownerId}">
-  `;
   
   document.body.appendChild(form);
   form.submit();

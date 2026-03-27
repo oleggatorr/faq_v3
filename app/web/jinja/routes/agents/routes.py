@@ -10,17 +10,22 @@ from app.core.auth import (
     check_agent_delete,
     check_agent_edit,
     check_agent_view,
-    CurrentAgent,
 )
 from app.core.permissions import (
-    Permission,
     PERMISSION_LABELS,
+    PERMISSION_GROUPS,
+    Permission,
 )
 from app.models import get_db
 from app.models.agent import Agent
 from app.models.question_category import QuestionCategory
-from app.schemas.agent import AgentCreate, AgentUpdate
-from app.services.agent_service import AgentService
+from app.schemas.agent import AgentCreate
+from app.services import (
+    AgentQueryService,
+    AgentCreateService,
+    AgentEditService,
+    AgentDeleteService,
+)
 from app.services.audit_log_service import AuditLogService
 from app.services.department_service import DepartmentService
 
@@ -40,14 +45,18 @@ def agents_list(
     limit: int = Query(50, ge=1, le=500),
     offset: int = Query(0, ge=0),
 ):
-    agent_service = AgentService(db)
+    # Используем новый сервис для просмотра
+    query_service = AgentQueryService(db, current_agent_id=agent.id)
     filters = _agent_filters(request)
 
     # Получаем общее количество один раз
-    total_agents = agent_service.list(filters=filters if filters else None, limit=999999)
-    
+    total_agents = query_service.list(
+        filters=filters if filters else None,
+        limit=999999,
+    )
+
     # Получаем страницу
-    agents = agent_service.list(
+    agents = query_service.list(
         filters=filters if filters else None,
         sort_by=sort_by,
         sort_desc=sort_desc,
@@ -107,6 +116,7 @@ def add_agent_form(
             "error": None,
             "permissions_list": list(Permission),
             "permission_labels": PERMISSION_LABELS,
+            "permission_groups": PERMISSION_GROUPS,
             "form_data": None,
             **agent.get_permissions_dict(),
         },
@@ -129,10 +139,8 @@ def add_agent_submit(
     permissions: list[str] = Form(default=[]),
     phone: str | None = Form(None),
 ):
-    agent_service = AgentService(db)
-
-    # Права остаются как есть (может быть пустым списком)
-    # Администратору права не нужны - у него полный доступ
+    # Используем новый сервис для создания
+    create_service = AgentCreateService(db, current_agent_id=agent.id)
 
     # Проверка совпадения паролей
     if password != password_confirm:
@@ -169,7 +177,7 @@ def add_agent_submit(
             status_code=400,
         )
 
-    # Проверка на дубликаты
+    # Проверка на дубликаты (теперь делается в сервисе, но оставим для лучшего UX)
     existing_by_email = db.query(Agent).filter(Agent.email == email.strip().lower()).first()
     existing_by_login = db.query(Agent).filter(Agent.login == login.strip()).first()
 
@@ -213,8 +221,9 @@ def add_agent_submit(
             },
             status_code=400,
         )
-    
+
     try:
+        # Права для админа — пустые (админ имеет все права автоматически)
         if role == "admin":
             category_access_str = ""
             permissions_str = ""
@@ -222,22 +231,20 @@ def add_agent_submit(
             category_access_str = ",".join(category_access)
             permissions_str = ",".join(permissions)
 
-        from app.core.security import hash_password
-
-        agent_data = AgentCreate(
-            full_name=full_name.strip(),
-            login=login.strip(),
+        # Используем метод create_with_password для удобства
+        new_agent = create_service.create_with_password(
             email=email.strip().lower(),
-            password_hash=hash_password(password),
+            full_name=full_name.strip(),
+            password=password,
             role=role,
             department_id=department_id,
+            login=login.strip(),
+            phone=phone.strip() if phone else None,
             category_access=category_access_str,
             permissions=permissions_str,
             is_active=True,
-            phone=phone.strip() if phone else None,
+            created_by_agent_id=agent.id,
         )
-
-        new_agent = agent_service.create(agent_data=agent_data)
 
         # Логируем создание агента
         client_info = get_client_info(request)
@@ -245,7 +252,7 @@ def add_agent_submit(
         log_service.log_action(
             action="create",
             entity_type="agent",
-            entity_id=None,
+            entity_id=new_agent.id,
             agent_id=agent.id,
             details={
                 "full_name": full_name,
@@ -261,6 +268,40 @@ def add_agent_submit(
 
         return RedirectResponse(url="/agents", status_code=303)
 
+    except ValueError as e:
+        # Ошибка валидации (дубликат email/login)
+        categories = db.query(QuestionCategory).filter(
+            QuestionCategory.is_active == True
+        ).order_by(QuestionCategory.name).all()
+        dept_service = DepartmentService(db)
+        departments = dept_service.list(
+            filters={"is_active": True},
+            sort_by="name",
+            limit=200,
+        )
+        return templates.TemplateResponse(
+            "agents/add.html",
+            {
+                "request": request,
+                "agent": agent,
+                "error": str(e),
+                "categories": categories,
+                "departments": departments,
+                "permissions_list": list(Permission),
+                "permission_labels": PERMISSION_LABELS,
+                "form_data": {
+                    "full_name": full_name,
+                    "login": login,
+                    "email": email,
+                    "role": role,
+                    "department_id": department_id,
+                    "phone": phone,
+                    "category_access": category_access,
+                    "permissions": permissions,
+                },
+            },
+            status_code=400,
+        )
     except Exception as e:
         categories = db.query(QuestionCategory).filter(
             QuestionCategory.is_active == True
@@ -304,15 +345,15 @@ def edit_agent_form(
     agent: AgentRead = Depends(check_agent_edit),
     db: Session = Depends(get_db),
 ):
-    agent_service = AgentService(db)
-
-    target_agent = agent_service.get(agent_id=agent_id)
+    # Используем новый сервис для просмотра
+    query_service = AgentQueryService(db, current_agent_id=agent.id)
+    target_agent = query_service.get(agent_id=agent_id)
 
     # Получаем список категорий вопросов
     categories = db.query(QuestionCategory).filter(
         QuestionCategory.is_active == True
     ).order_by(QuestionCategory.name).all()
-    
+
     # Получаем список департаментов для основного департамента агента
     dept_service = DepartmentService(db)
     departments = dept_service.list(
@@ -335,6 +376,7 @@ def edit_agent_form(
             "error": None,
             "permissions_list": list(Permission),
             "permission_labels": PERMISSION_LABELS,
+            "permission_groups": PERMISSION_GROUPS,
             "selected_categories": selected_categories,
             "selected_permissions": selected_permissions,
             **agent.get_permissions_dict(),
@@ -360,10 +402,8 @@ def edit_agent_submit(
     phone: str | None = Form(None),
     is_active: bool = Form(False),
 ):
-    agent_service = AgentService(db)
-
-    # Права остаются как есть (может быть пустым списком)
-    # Администратору права не нужны - у него полный доступ
+    # Используем новый сервис для редактирования
+    edit_service = AgentEditService(db, current_agent_id=agent.id)
 
     # Проверка совпадения паролей
     if password or password_confirm:
@@ -377,7 +417,8 @@ def edit_agent_submit(
                 sort_by="name",
                 limit=200,
             )
-            target_agent = agent_service.get(agent_id=agent_id)
+            query_service = AgentQueryService(db, current_agent_id=agent.id)
+            target_agent = query_service.get(agent_id=agent_id)
             return templates.TemplateResponse(
                 "agents/edit.html",
                 {
@@ -397,6 +438,7 @@ def edit_agent_submit(
             )
 
     try:
+        # Права для админа — пустые (админ имеет все права автоматически)
         if role == "admin":
             category_access_str = ""
             permissions_str = ""
@@ -404,7 +446,8 @@ def edit_agent_submit(
             category_access_str = ",".join(category_access)
             permissions_str = ",".join(permissions)
 
-        from app.core.security import hash_password
+        # Собираем данные для обновления
+        from app.schemas.agent import AgentUpdate
 
         update_data = {
             "full_name": full_name.strip(),
@@ -418,14 +461,17 @@ def edit_agent_submit(
             "is_active": is_active,
         }
 
+        # Пароль добавляем только если указан
         if password and password.strip():
-            update_data["password_hash"] = hash_password(password)
+            update_data["password"] = password
 
-        agent_service.update(
+        # Вызываем сервис
+        edit_service.update(
             agent_id=agent_id,
             agent_data=AgentUpdate(**update_data),
+            updated_by_agent_id=agent.id,
         )
-        
+
         # Логируем редактирование агента
         client_info = get_client_info(request)
         log_service = AuditLogService(db)
@@ -460,7 +506,8 @@ def edit_agent_submit(
             sort_by="name",
             limit=200,
         )
-        target_agent = agent_service.get(agent_id=agent_id)
+        query_service = AgentQueryService(db, current_agent_id=agent.id)
+        target_agent = query_service.get(agent_id=agent_id)
 
         return templates.TemplateResponse(
             "agents/edit.html",
@@ -488,6 +535,10 @@ def delete_agent(
     agent: AgentRead = Depends(check_agent_delete),
     db: Session = Depends(get_db),
 ):
+    # Используем новый сервис для удаления
+    delete_service = AgentDeleteService(db, current_agent_id=agent.id)
+
+    # Проверка: нельзя удалить самого себя
     if agent.id == agent_id:
         return templates.TemplateResponse(
             "agents/list.html",
@@ -500,8 +551,7 @@ def delete_agent(
             status_code=403,
         )
 
-    agent_service = AgentService(db)
-    result = agent_service.delete(agent_id=agent_id)
+    result = delete_service.delete(agent_id=agent_id, deleted_by_agent_id=agent.id)
 
     if result.success:
         # Логируем удаление агента
@@ -523,5 +573,5 @@ def delete_agent(
     else:
         # Flash-сообщение об ошибке
         request.session["flash_error"] = result.detail or "Ошибка при удалении агента"
-        
+
         return RedirectResponse(url="/agents", status_code=303)

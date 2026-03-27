@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.errors import AccessDeniedError
-from app.core.permissions import Permission
+from app.core.permissions import Permission, has_permission, is_admin
 from app.core.security import verify_password, verify_token
 from app.models import get_db
 from app.models.agent import Agent, AgentRole
@@ -123,90 +123,117 @@ def _check_permissions(
 # Явные зависимости для каждого права (чтобы FastAPI видел правильную сигнатуру)
 def check_can_view_tickets(request: Request, db: Session = Depends(get_db)) -> AgentRead:
     agent = get_current_agent(request, db)
-    if agent.role == AgentRole.admin:
+    if is_admin(agent):
         return agent
-    if not agent.has_permission(Permission.can_view_tickets):
+    if not has_permission(agent, Permission.can_view_tickets):
         raise AccessDeniedError("Нет прав доступа", required_permission="can_view_tickets")
     return agent
 
 def check_can_submit_any_cat(request: Request, db: Session = Depends(get_db)) -> AgentRead:
     agent = get_current_agent(request, db)
-    if agent.role == AgentRole.admin:
+    if is_admin(agent):
         return agent
-    if not agent.has_permission(Permission.can_submit_any_cat):
+    if not has_permission(agent, Permission.can_submit_any_cat):
         raise AccessDeniedError("Нет прав доступа", required_permission="can_submit_any_cat")
     return agent
 
 def check_can_reply_tickets(request: Request, db: Session = Depends(get_db)) -> AgentRead:
     agent = get_current_agent(request, db)
-    if agent.role == AgentRole.admin:
+    if is_admin(agent):
         return agent
-    if not agent.has_permission(Permission.can_reply_tickets):
+    if not has_permission(agent, Permission.can_reply_tickets):
         raise AccessDeniedError("Нет прав доступа", required_permission="can_reply_tickets")
     return agent
 
 def check_can_edit_tickets(request: Request, db: Session = Depends(get_db)) -> AgentRead:
     agent = get_current_agent(request, db)
-    if agent.role == AgentRole.admin:
+    if is_admin(agent):
         return agent
-    if not agent.has_permission(Permission.can_edit_tickets):
+    if not has_permission(agent, Permission.can_edit_tickets):
         raise AccessDeniedError("Нет прав доступа", required_permission="can_edit_tickets")
     return agent
 
 def check_can_del_tickets(request: Request, db: Session = Depends(get_db)) -> AgentRead:
     agent = get_current_agent(request, db)
-    if agent.role == AgentRole.admin:
+    if is_admin(agent):
         return agent
-    if not agent.has_permission(Permission.can_del_tickets):
+    if not has_permission(agent, Permission.can_del_tickets):
         raise AccessDeniedError("Нет прав доступа", required_permission="can_del_tickets")
     return agent
 
 
 def check_can_hard_del_tickets(request: Request, db: Session = Depends(get_db)) -> AgentRead:
     agent = get_current_agent(request, db)
-    if agent.role == AgentRole.admin:
+    if is_admin(agent):
         return agent
-    if not agent.has_permission(Permission.can_hard_del_tickets):
+    if not has_permission(agent, Permission.can_hard_del_tickets):
         raise AccessDeniedError("Нет прав доступа", required_permission="can_hard_del_tickets")
+    return agent
+
+def check_can_view_unassigned(request: Request, db: Session = Depends(get_db)) -> AgentRead:
+    """Проверка права на просмотр неназначенных тикетов."""
+    agent = get_current_agent(request, db)
+    if is_admin(agent):
+        return agent
+    if not has_permission(agent, Permission.can_view_unassigned):
+        raise AccessDeniedError("Нет прав доступа", required_permission="can_view_unassigned")
+    return agent
+
+def check_can_view_ass_others(request: Request, db: Session = Depends(get_db)) -> AgentRead:
+    """Проверка права на просмотр тикетов других операторов."""
+    agent = get_current_agent(request, db)
+    if is_admin(agent):
+        return agent
+    if not has_permission(agent, Permission.can_view_ass_others):
+        raise AccessDeniedError("Нет прав доступа", required_permission="can_view_ass_others")
+    return agent
+
+def check_can_view_own_tickets(request: Request, db: Session = Depends(get_db)) -> AgentRead:
+    """Проверка права на просмотр своих тикетов."""
+    agent = get_current_agent(request, db)
+    if is_admin(agent):
+        return agent
+    if not has_permission(agent, Permission.can_view_own_tickets):
+        raise AccessDeniedError("Нет прав доступа", required_permission="can_view_own_tickets")
     return agent
 
 def check_agent_view(request: Request, db: Session = Depends(get_db)) -> AgentRead:
     agent = get_current_agent(request, db)
-    if agent.role == AgentRole.admin:
+    if is_admin(agent):
         return agent
-    if not agent.has_permission(Permission.agent_view):
+    if not has_permission(agent, Permission.agent_view):
         raise AccessDeniedError("Нет прав доступа", required_permission="agent_view")
     return agent
 
 def check_agent_create(request: Request, db: Session = Depends(get_db)) -> AgentRead:
     agent = get_current_agent(request, db)
-    if agent.role == AgentRole.admin:
+    if is_admin(agent):
         return agent
-    if not agent.has_permission(Permission.agent_create):
+    if not has_permission(agent, Permission.agent_create):
         raise AccessDeniedError("Нет прав доступа", required_permission="agent_create")
     return agent
 
 def check_agent_edit(request: Request, db: Session = Depends(get_db)) -> AgentRead:
     agent = get_current_agent(request, db)
-    if agent.role == AgentRole.admin:
+    if is_admin(agent):
         return agent
-    if not agent.has_permission(Permission.agent_edit):
+    if not has_permission(agent, Permission.agent_edit):
         raise AccessDeniedError("Нет прав доступа", required_permission="agent_edit")
     return agent
 
 def check_agent_delete(request: Request, db: Session = Depends(get_db)) -> AgentRead:
     agent = get_current_agent(request, db)
-    if agent.role == AgentRole.admin:
+    if is_admin(agent):
         return agent
-    if not agent.has_permission(Permission.agent_delete):
+    if not has_permission(agent, Permission.agent_delete):
         raise AccessDeniedError("Нет прав доступа", required_permission="agent_delete")
     return agent
 
 def check_audit_logs_view(request: Request, db: Session = Depends(get_db)) -> AgentRead:
     agent = get_current_agent(request, db)
-    if agent.role == AgentRole.admin:
+    if is_admin(agent):
         return agent
-    if not agent.has_permission(Permission.audit_logs_view):
+    if not has_permission(agent, Permission.audit_logs_view):
         raise AccessDeniedError("Нет прав доступа", required_permission="audit_logs_view")
     return agent
 
@@ -214,9 +241,9 @@ def check_audit_logs_view(request: Request, db: Session = Depends(get_db)) -> Ag
 def check_category_manage(request: Request, db: Session = Depends(get_db)) -> AgentRead:
     """Проверка права на управление категориями вопросов."""
     agent = get_current_agent(request, db)
-    if agent.role == AgentRole.admin:
+    if is_admin(agent):
         return agent
-    if not agent.has_permission(Permission.can_man_cat):
+    if not has_permission(agent, Permission.can_man_cat):
         raise AccessDeniedError("Нет прав доступа", required_permission="can_man_cat")
     return agent
 

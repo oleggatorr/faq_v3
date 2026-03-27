@@ -2,7 +2,8 @@ from enum import Enum
 
 
 class Permission(str, Enum):
-    can_view_tickets = "can_view_tickets"
+    can_view_tickets = "can_view_tickets"  # Просмотр деталей тикета
+    can_view_own_tickets = "can_view_own_tickets"  # Просмотр списка своих тикетов
     can_reply_tickets = "can_reply_tickets"
     can_del_tickets = "can_del_tickets"
     can_hard_del_tickets = "can_hard_del_tickets"  # Полное удаление тикетов
@@ -51,7 +52,8 @@ ALL_PERMISSIONS = list(Permission)
 
 # 📘 Человекочитаемые названия
 PERMISSION_LABELS = {
-    Permission.can_view_tickets: "Просмотр тикетов",
+    Permission.can_view_tickets: "Просмотр тикетов (детали)",
+    Permission.can_view_own_tickets: "Просмотр своих тикетов (список)",
     Permission.can_reply_tickets: "Ответ на тикеты",
     Permission.can_del_tickets: "Удаление тикетов (архив)",
     Permission.can_hard_del_tickets: "Полное удаление тикетов",
@@ -96,7 +98,8 @@ PERMISSION_LABELS = {
 # 📂 Группировка (очень удобно для UI)
 PERMISSION_GROUPS = {
     "Тикеты": [
-        Permission.can_view_tickets,
+        Permission.can_view_own_tickets,  # Просмотр списка своих тикетов
+        Permission.can_view_tickets,  # Просмотр деталей тикета
         Permission.can_reply_tickets,
         Permission.can_edit_tickets,
         Permission.can_del_tickets,
@@ -179,12 +182,17 @@ DEFAULT_READONLY_PERMISSIONS = [
 
 # 🔐 Проверка прав
 def has_permission(agent, permission: Permission) -> bool:
+    """
+    Проверить наличие права у агента.
+    Администратор всегда имеет все права.
+    """
+    # Админ имеет всё (проверяем и строку, и AgentRole)
+    role = getattr(agent, "role", None)
+    if role == "admin" or str(role) == "admin":
+        return True
+    
     if not agent.permissions:
         return False
-
-    # админ имеет всё
-    if getattr(agent, "role", None) == "admin":
-        return True
 
     user_perms = set(agent.permissions.split(","))
     return permission.value in user_perms
@@ -192,6 +200,7 @@ def has_permission(agent, permission: Permission) -> bool:
 
 # 🔧 Получить список прав пользователя
 def get_agent_permissions(agent) -> set[str]:
+    """Получить набор прав агента."""
     if not agent.permissions:
         return set()
     return set(agent.permissions.split(","))
@@ -199,4 +208,6 @@ def get_agent_permissions(agent) -> set[str]:
 
 # 🔧 Проверка роли
 def is_admin(agent) -> bool:
-    return getattr(agent, "role", None) == "admin"
+    """Проверить, является ли агент администратором."""
+    role = getattr(agent, "role", None)
+    return role == "admin" or str(role) == "admin"

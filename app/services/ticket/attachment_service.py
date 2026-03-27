@@ -11,9 +11,9 @@ from app.models.ticket_event import EventType
 from app.schemas.attachment import AttachmentCreate, AttachmentRead, AttachmentUpdate
 from app.schemas.deletion import DeleteResponse
 
-from .errors import NotFound
-from .ticket_event_service import TicketEventService
-from .utils import apply_filters, apply_sort
+from app.services.errors import NotFound
+from app.services.ticket.ticket_event_service import TicketEventService
+from app.services.utils import apply_filters, apply_sort
 
 
 class AttachmentService:

@@ -13,7 +13,10 @@ from app.core.auth import (
     check_can_edit_tickets,
     check_can_hard_del_tickets,
     check_can_reply_tickets,
+    check_can_view_ass_others,
+    check_can_view_own_tickets,
     check_can_view_tickets,
+    check_can_view_unassigned,
     get_current_agent,
     get_current_agent_optional,
     require_permission,
@@ -26,15 +29,17 @@ from app.schemas.agent import AgentRead
 from app.schemas.message import MessageCreate
 from app.schemas.ticket import TicketUpdate
 from app.services.agent_service import AgentService
-from app.services.attachment_service import AttachmentService
 from app.services.audit_log_service import AuditLogService
 from app.services.question_category_service import QuestionCategoryService
 from app.services.errors import NotFound
 from app.services.file_storage_service import FileStorageError, FileStorageService
-from app.services.message_service import MessageService
-from app.services.ticket_event_service import TicketEventService
-from app.services.ticket_service import TicketService
 from app.services.ticket_status_service import TicketStatusService
+from app.services.ticket import (
+    TicketService,
+    TicketEventService,
+    MessageService,
+    AttachmentService,
+)
 
 from ..main import templates
 from ..utils import _ticket_filters
@@ -135,27 +140,28 @@ async def create_ticket_submit(
     return RedirectResponse(url="/tickets", status_code=303)
 
 
-@router.get("/tickets/my", response_class=HTMLResponse)
-def tickets_my(
+@router.get("/tickets/unassigned", response_class=HTMLResponse)
+def tickets_unassigned(
     request: Request,
-    agent: AgentRead = Depends(get_current_agent),  # Просто авторизация, без проверки прав
+    agent: AgentRead = Depends(check_can_view_unassigned),  # Право на просмотр неназначенных
     db: Session = Depends(get_db),
-    status_id: str | None = Query(None),  # Строка для обработки пустой строки
-    category_id: str | None = Query(None),  # Строка для обработки пустой строки
-    sort_by: str = Query("id", description="Sort field"),
-    sort_desc: bool = Query(False, description="Sort descending"),
+    status_id: str | None = Query(None),
+    category_id: str | None = Query(None),
+    sort_by: str = Query("created_at", description="Sort field"),
+    sort_desc: bool = Query(True, description="Sort descending"),
     limit: int = Query(50, ge=1, le=500),
     offset: int = Query(0, ge=0),
     archived: str = Query("active", description="Filter by archived: active, archived, all"),
 ):
-    """Тикеты, назначенные текущему агенту."""
-    ticket_service = TicketService(db)
+    """Неназначенные тикеты (требует права can_view_unassigned)."""
+    # Передаём agent_id для проверок прав в сервисе
+    ticket_service = TicketService(db, agent_id=agent.id)
     category_service = QuestionCategoryService(db)
     status_service = TicketStatusService(db)
     agent_service = AgentService(db)
 
-    # Фильтр: только тикеты, назначенные текущему агенту
-    filters = {"owner_id": agent.id}
+    # Фильтр: только неназначенные тикеты
+    filters = {"owner_id": None}
 
     # Преобразуем пустые строки в None
     status_id_int = int(status_id) if status_id and status_id.strip() else None
@@ -186,12 +192,12 @@ def tickets_my(
     category_name_by_id = {c.id: c.name for c in categories}
     status_name_by_id = {s.id: s.name for s in statuses}
 
-    # Получаем общее количество (используем list с большим лимитом)
+    # Получаем общее количество
     all_tickets = ticket_service.list(filters=filters, limit=999999)
     total_count = len(all_tickets)
 
     return templates.TemplateResponse(
-        "tickets/my.html",
+        "tickets/unassigned.html",
         {
             "request": request,
             "agent": agent,
@@ -212,35 +218,142 @@ def tickets_my(
     )
 
 
-@router.get("/tickets", response_class=HTMLResponse)
-def tickets_list(
+@router.get("/tickets/others", response_class=HTMLResponse)
+def tickets_others(
     request: Request,
-    agent: AgentRead = Depends(check_can_view_tickets),
+    agent: AgentRead = Depends(check_can_view_ass_others),  # Право на просмотр чужих
     db: Session = Depends(get_db),
-    q: str = Query("", description="Quick search by track_id/subject/customer"),
-    status_id: str | None = Query(None),  # Строка для обработки пустой строки
-    category_id: str | None = Query(None),  # Строка для обработки пустой строки
-    sort_by: str = Query("id", description="Sort field"),
-    sort_desc: bool = Query(False, description="Sort descending"),
+    status_id: str | None = Query(None),
+    category_id: str | None = Query(None),
+    sort_by: str = Query("created_at", description="Sort field"),
+    sort_desc: bool = Query(True, description="Sort descending"),
     limit: int = Query(50, ge=1, le=500),
     offset: int = Query(0, ge=0),
     archived: str = Query("active", description="Filter by archived: active, archived, all"),
 ):
-    ticket_service = TicketService(db)
+    """Тикеты, назначенные другим агентам (требует права can_view_ass_others)."""
+    # Передаём agent_id для проверок прав в сервисе
+    ticket_service = TicketService(db, agent_id=agent.id)
     category_service = QuestionCategoryService(db)
     status_service = TicketStatusService(db)
     agent_service = AgentService(db)
-    filters = _ticket_filters(request)
-    
+
+    # Фильтр: только тикеты, назначенные другим агентам
+    filters = {"owner_id": agent.id}  # Будет инвертировано ниже
+
     # Преобразуем пустые строки в None
     status_id_int = int(status_id) if status_id and status_id.strip() else None
     category_id_int = int(category_id) if category_id and category_id.strip() else None
-    
+
+    # Дополнительные фильтры
     if status_id_int:
         filters["status_id"] = status_id_int
     if category_id_int:
         filters["category_id"] = category_id_int
+
+    # Фильтр по архиву
+    if archived == "active":
+        filters["is_archived"] = False
+    elif archived == "archived":
+        filters["is_archived"] = True
+
+    tickets = ticket_service.list(
+        filters=filters,
+        sort_by=sort_by,
+        sort_desc=sort_desc,
+        limit=limit,
+        offset=offset,
+    )
+    # Фильтруем тикеты, назначенные другим (не текущему агенту и не None)
+    tickets = [t for t in tickets if t.owner_id and t.owner_id != agent.id]
     
+    categories = category_service.list(limit=500)
+    statuses = status_service.list(limit=200)
+    agents = agent_service.list(filters={"is_active": True}, sort_by="full_name", limit=500)
+    category_name_by_id = {c.id: c.name for c in categories}
+    status_name_by_id = {s.id: s.name for s in statuses}
+
+    # Получаем общее количество
+    all_tickets = ticket_service.list(filters=filters, limit=999999)
+    all_tickets = [t for t in all_tickets if t.owner_id and t.owner_id != agent.id]
+    total_count = len(all_tickets)
+
+    return templates.TemplateResponse(
+        "tickets/others.html",
+        {
+            "request": request,
+            "agent": agent,
+            "tickets": tickets,
+            "category_name_by_id": category_name_by_id,
+            "status_name_by_id": status_name_by_id,
+            "statuses": statuses,
+            "categories": categories,
+            "agents": agents,
+            "sort_by": sort_by,
+            "sort_desc": sort_desc,
+            "limit": limit,
+            "offset": offset,
+            "archived_filter": archived,
+            "total_count": total_count,
+            **agent.get_permissions_dict(),
+        },
+    )
+
+
+@router.get("/tickets/my", response_class=HTMLResponse)
+def tickets_my(
+    request: Request,
+    agent: AgentRead = Depends(check_can_view_own_tickets),  # Право на просмотр своих тикетов
+    db: Session = Depends(get_db),
+    status_id: str | None = Query(None),
+    category_id: str | None = Query(None),
+    sort_by: str = Query("created_at", description="Sort field"),
+    sort_desc: bool = Query(True, description="Sort descending"),
+    limit: int = Query(50, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    archived: str = Query("active", description="Filter by archived: active, archived, all"),
+):
+    """Тикеты, назначенные текущему агенту (требует права can_view_tickets)."""
+    # Передаём agent_id для проверок прав в сервисе
+    ticket_service = TicketService(db, agent_id=agent.id)
+    category_service = QuestionCategoryService(db)
+    status_service = TicketStatusService(db)
+    agent_service = AgentService(db)
+
+    # Фильтр: только тикеты, назначенные текущему агенту
+    filters = {"owner_id": agent.id}
+
+
+@router.get("/tickets", response_class=HTMLResponse)
+def tickets_list(
+    request: Request,
+    agent: AgentRead = Depends(check_can_view_own_tickets),  # Право на просмотр списка тикетов
+    db: Session = Depends(get_db),
+    q: str = Query("", description="Quick search by track_id/subject/customer"),
+    status_id: str | None = Query(None),
+    category_id: str | None = Query(None),
+    sort_by: str = Query("created_at", description="Sort field"),
+    sort_desc: bool = Query(True, description="Sort descending"),
+    limit: int = Query(50, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    archived: str = Query("active", description="Filter by archived: active, archived, all"),
+):
+    # Сервис сам проверит права внутри (двойная защита)
+    ticket_service = TicketService(db, agent_id=agent.id)
+    category_service = QuestionCategoryService(db)
+    status_service = TicketStatusService(db)
+    agent_service = AgentService(db)
+    filters = _ticket_filters(request)
+
+    # Преобразуем пустые строки в None
+    status_id_int = int(status_id) if status_id and status_id.strip() else None
+    category_id_int = int(category_id) if category_id and category_id.strip() else None
+
+    if status_id_int:
+        filters["status_id"] = status_id_int
+    if category_id_int:
+        filters["category_id"] = category_id_int
+
     if q and not any(filters.get(k) for k in ("track_id", "subject", "customer_name", "customer_email")):
         filters["track_id"] = q.strip()
 
@@ -249,10 +362,6 @@ def tickets_list(
         filters["is_archived"] = False
     elif archived == "archived":
         filters["is_archived"] = True
-    # если archived == "all" — не добавляем фильтр
-
-    # В "/tickets" показываем все тикеты (без фильтра по owner_id)
-    # Фильтр по owner_id только в "/tickets/my"
 
     tickets = ticket_service.list(
         filters=filters if filters else None,
@@ -302,7 +411,8 @@ def ticket_detail_admin(
     agent: AgentRead = Depends(check_can_view_tickets),
     db: Session = Depends(get_db),
 ):
-    ticket_service = TicketService(db)
+    # Передаём agent_id для проверок прав в сервисе
+    ticket_service = TicketService(db, agent_id=agent.id)
     try:
         ticket = ticket_service.get(ticket_id=ticket_id)
     except NotFound:
@@ -385,7 +495,8 @@ async def admin_reply(
 ):
     is_internal_bool = is_internal.lower() in ("true", "on", "1", "yes")
 
-    ticket_service = TicketService(db, ticket_event_service=TicketEventService(db))
+    # Сервис сам проверит права внутри (двойная защита)
+    ticket_service = TicketService(db, agent_id=agent.id, ticket_event_service=TicketEventService(db))
     try:
         ticket = ticket_service.get(ticket_id=ticket_id)
     except NotFound:
@@ -405,7 +516,7 @@ async def admin_reply(
         ip_address=(request.client.host if request.client else None),
     )
     message = message_service.add_message(message_data=message_data, agent_id=agent.id)
-    
+
     # Логируем создание сообщения
     client_info = get_client_info(request)
     log_service = AuditLogService(db)
@@ -477,7 +588,8 @@ def admin_update_ticket(
     is_locked: str = Form("false"),
     is_archived: str = Form("false"),
 ):
-    ticket_service = TicketService(db, ticket_event_service=TicketEventService(db))
+    # Сервис сам проверит права внутри (двойная защита)
+    ticket_service = TicketService(db, agent_id=agent.id, ticket_event_service=TicketEventService(db))
     update_data = {}
 
     if status_id and status_id.isdigit():
@@ -536,7 +648,8 @@ async def delete_ticket(
     db: Session = Depends(get_db),
     agent: AgentRead = Depends(check_can_del_tickets),
 ):
-    ticket_service = TicketService(db)
+    # Сервис сам проверит права внутри (двойная защита)
+    ticket_service = TicketService(db, agent_id=agent.id)
     result = ticket_service.delete_ticket(
         ticket_id=ticket_id,
         agent_id=agent.id,
@@ -568,7 +681,8 @@ async def hard_delete_ticket(
     agent: AgentRead = Depends(check_can_hard_del_tickets),
 ):
     """Полное удаление тикета со всеми сообщениями и вложениями."""
-    ticket_service = TicketService(db)
+    # Передаём agent_id для проверок прав в сервисе
+    ticket_service = TicketService(db, agent_id=agent.id)
     result = ticket_service.hard_delete_ticket(
         ticket_id=ticket_id,
         agent_id=agent.id,

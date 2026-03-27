@@ -14,17 +14,19 @@ from app.models.ticket_event import EventType, TicketEvent
 from app.schemas.deletion import DeleteResponse
 from app.schemas.ticket import TicketCreate, TicketRead, TicketUpdate
 from app.services.errors import Conflict, NotFound, ValidationFailed
-from app.services.ticket_event_service import TicketEventService
+from app.services.ticket.ticket_event_service import TicketEventService
+from app.services.ticket.ticket_base_service import TicketBaseService
 from app.services.utils import apply_filters, apply_sort, format_preview
+from app.core.permissions import Permission
 
 
-class TicketService:
+class TicketService(TicketBaseService):
     """
     Ticket domain operations.
 
     Contract recap (based on `docs/06-services/index.md`):
     - `create_ticket_with_first_message`: create a ticket + first customer message
-      in one workflow, including `preview_message` computed from the first body.
+    in one workflow, including `preview_message` computed from the first body.
     """
 
     def __init__(
@@ -32,8 +34,9 @@ class TicketService:
         session: Session,
         *,
         ticket_event_service: TicketEventService | None = None,
+        agent_id: int | None = None,
     ):
-        self.session = session
+        super().__init__(session, agent_id=agent_id)
         self.ticket_event_service = ticket_event_service
 
     def _get_by_track_id(self, track_id: str) -> Optional[Ticket]:
@@ -151,6 +154,9 @@ class TicketService:
         return TicketRead.model_validate(ticket)
 
     def get(self, *, ticket_id: int) -> TicketRead:
+        # Проверка права на просмотр тикетов
+        self._check_permission(Permission.can_view_tickets)
+        
         ticket = self.session.query(Ticket).filter(Ticket.id == ticket_id).one_or_none()
         if ticket is None:
             raise NotFound("Ticket not found")
@@ -165,6 +171,9 @@ class TicketService:
         limit: int = 100,
         offset: int = 0,
     ) -> list[TicketRead]:
+        # Проверка права выполняется на уровне роута (check_can_view_*)
+        # Здесь просто фильтрация и выборка
+
         allowed_filters = {
             "id",
             "track_id",
@@ -281,6 +290,9 @@ class TicketService:
         agent_id: int | None,
         commit: bool = True,
     ) -> Ticket:
+        # Проверка права на редактирование тикетов
+        self._check_permission(Permission.can_edit_tickets)
+        
         ticket = self.session.query(Ticket).filter(Ticket.id == ticket_id).one_or_none()
         if ticket is None:
             raise NotFound("Ticket not found")
@@ -411,6 +423,9 @@ class TicketService:
         agent_id: int | None,
         commit: bool = True,
     ) -> DeleteResponse:
+        # Проверка права на удаление тикетов
+        self._check_permission(Permission.can_del_tickets)
+        
         ticket = self.session.query(Ticket).filter(Ticket.id == ticket_id).one_or_none()
         if ticket is None:
             return DeleteResponse(success=False, deleted_id=None, detail="Ticket not found")

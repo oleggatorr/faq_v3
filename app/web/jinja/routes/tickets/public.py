@@ -13,17 +13,14 @@ from app.models.department import Department
 from app.models.ticket import Priority
 from app.schemas.ticket import TicketCreate
 from app.services.agent_service import AgentService
-from app.services.attachment_service import AttachmentService
 from app.services.audit_log_service import AuditLogService
 from app.services.department_service import DepartmentService
 from app.services.errors import Conflict as ServiceConflict
 from app.services.errors import NotFound as ServiceNotFound
 from app.services.file_storage_service import FileStorageService
 from app.services.language_service import LanguageService
-from app.services.message_service import MessageService
 from app.services.question_category_service import QuestionCategoryService
-from app.services.ticket_event_service import TicketEventService
-from app.services.ticket_service import TicketService
+from app.services.ticket import TicketService, TicketEventService, MessageService, AttachmentService
 
 from ..main import templates
 
@@ -91,7 +88,8 @@ def ticket_by_track_id(
     if not agent:
         return RedirectResponse(url=f"/ticket/{track_id}/message", status_code=303)
 
-    ticket_service = TicketService(db)
+    # Передаём agent_id только если агент авторизован
+    ticket_service = TicketService(db, agent_id=agent.id if agent else None)
     try:
         ticket = ticket_service.get_by_track_id(track_id)
     except ServiceNotFound:
@@ -125,7 +123,7 @@ def ticket_messages_by_track_id(
     - пользователь (без авторизации): публичный чат по track_id
     """
     track_id = track_id.strip().upper()
-    ticket_service = TicketService(db)
+    ticket_service = TicketService(db, agent_id=agent.id if agent else None)
     try:
         ticket = ticket_service.get_by_track_id(track_id)
     except ServiceNotFound:

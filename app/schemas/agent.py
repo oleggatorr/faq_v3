@@ -59,32 +59,35 @@ class AgentRead(AgentBase):
         Проверить наличие права у агента.
         Администратор всегда имеет все права.
         """
-        if self.role == AgentRole.admin:
+        # Админ всегда имеет все права (сравниваем и со строкой, и с AgentRole)
+        if self.role == AgentRole.admin or str(self.role) == "admin":
             return True
         return permission.value in self._get_permissions_set()
     
     def has_any_permission(self, *permissions: Permission) -> bool:
         """Проверить наличие хотя бы одного из указанных прав."""
-        if self.role == AgentRole.admin:
+        # Админ всегда имеет все права
+        if self.role == AgentRole.admin or str(self.role) == "admin":
             return True
         user_perms = self._get_permissions_set()
         return any(p.value in user_perms for p in permissions)
-    
+
     def has_all_permissions(self, *permissions: Permission) -> bool:
         """Проверить наличие всех указанных прав."""
-        if self.role == AgentRole.admin:
+        # Админ всегда имеет все права
+        if self.role == AgentRole.admin or str(self.role) == "admin":
             return True
         user_perms = self._get_permissions_set()
         return all(p.value in user_perms for p in permissions)
-    
+
     def get_permissions_dict(self) -> dict[str, bool]:
         """
         Вернуть dict {can_permission_name: bool} для всех прав.
         Используется для передачи в шаблоны.
         """
-        # Админ всегда имеет все права
-        is_admin = isinstance(self.role, AgentRole) and self.role == AgentRole.admin
-        
+        # Админ всегда имеет все права (сравниваем и со строкой, и с AgentRole)
+        is_admin = self.role == AgentRole.admin or str(self.role) == "admin"
+
         if is_admin:
             return {perm.value: True for perm in Permission}
 

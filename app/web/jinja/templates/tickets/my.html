@@ -1,23 +1,29 @@
 {% extends "base.html" %}
 
-{% block title %}Назначенные мне{% endblock %}
+{% block title %}Мои тикеты{% endblock %}
 
 {% block content %}
 <div class="page-header">
-  <h1 class="page-title">📋 Назначенные мне</h1>
+  <h1 class="page-title">📋 Мои тикеты</h1>
   <div>
     <a href="/new-ticket" class="btn btn-primary">
       ➕ Создать обращение
     </a>
-    <a href="/tickets" class="btn btn-outline-secondary ms-2">
+    <a href="/tickets/all" class="btn btn-outline-secondary ms-2">
       📂 Все тикеты
+    </a>
+    <a href="/tickets/unassigned" class="btn btn-outline-secondary ms-2">
+      📥 Неназначенные
+    </a>
+    <a href="/tickets/others" class="btn btn-outline-secondary ms-2">
+      👥 Чужие тикеты
     </a>
   </div>
 </div>
 
 <!-- Фильтры -->
 <div class="filters-card">
-  <form method="get" action="/tickets/my">
+  <form method="get" action="/tickets">
     <div class="row g-3">
       <!-- Статус -->
       <div class="col-md-3">

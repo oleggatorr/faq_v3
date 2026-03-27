@@ -1,6 +1,26 @@
 # Контракты сервисов — полная документация
 
-## 📁 Модуль агентов (`app/services/agent_*`)
+## � Навигация по документации
+
+### Сервисы агентов
+- [`AgentQueryService`](#agentqueryservice) — просмотр агентов (списки, детали)
+- [`AgentCreateService`](#agentcreateservice) — создание агентов
+- [`AgentEditService`](#agenteditservice) — редактирование агентов
+- [`AgentDeleteService`](#agentdeleteservice) — удаление агентов
+
+### Сервисы тикетов
+- [`TicketService`](#ticketservice) — CRUD тикетов + бизнес-логика
+- [`TicketEventService`](#ticketeventservice) — события тикетов (audit log)
+- [`MessageService`](#messageservice) — сообщения и примечания
+- [`AttachmentService`](#attachmentservice) — вложения
+
+### Система прав доступа
+- [Права и зависимости](#права-и-зависимости)
+- [Уровни проверок](#уровни-проверок)
+
+---
+
+## �📁 Модуль агентов (`app/services/agent_*`)
 
 ---
 
@@ -250,13 +270,19 @@ service.add_permission(agent_id=5, permission=Permission.can_edit_tickets)
 
 ## 📁 Модуль тикетов (`app/services/ticket/`)
 
+### Навигация
+- [`TicketService`](#ticketservice) — CRUD тикетов + бизнес-логика
+- [`TicketEventService`](#ticketeventservice) — события тикетов (audit log)
+- [`MessageService`](#messageservice) — сообщения и примечания
+- [`AttachmentService`](#attachmentservice) — вложения
+
 ---
 
-### TicketQueryService
+### TicketService
 
-**Файл:** `app/services/ticket/ticket_query_service.py`
+**Файл:** `app/services/ticket/ticket_service.py`
 
-**Назначение:** Чтение и фильтрация тикетов.
+**Назначение:** CRUD тикетов + бизнес-логика (создание, редактирование, удаление, проверка прав).
 
 | Метод | Вход | Выход | Описание |
 |-------|------|-------|----------|
@@ -692,6 +718,52 @@ with db.begin():
     service.archive(ticket_id=1)
     service.archive(ticket_id=2)
     service.archive(ticket_id=3)
+```
+
+---
+
+## 🔐 Права и зависимости
+
+### Права для тикетов
+
+| Право | Описание | Зависимость |
+|-------|----------|-------------|
+| `can_view_own_tickets` | Просмотр списка своих тикетов | `check_can_view_own_tickets` |
+| `can_view_unassigned` | Просмотр неназначенных тикетов | `check_can_view_unassigned` |
+| `can_view_ass_others` | Просмотр чужих тикетов | `check_can_view_ass_others` |
+| `can_view_all_tickets` | Просмотр всех тикетов (требует все 3 выше) | `check_can_view_all_tickets` |
+| `can_view_tickets` | Просмотр деталей тикета | `check_can_view_tickets` |
+| `can_reply_tickets` | Ответ на тикеты | `check_can_reply_tickets` |
+| `can_edit_tickets` | Редактирование тикетов | `check_can_edit_tickets` |
+| `can_del_tickets` | Удаление тикетов (архив) | `check_can_del_tickets` |
+| `can_hard_del_tickets` | Полное удаление | `check_can_hard_del_tickets` |
+
+### Права для агентов
+
+| Право | Описание | Зависимость |
+|-------|----------|-------------|
+| `agent_view` | Просмотр агентов | `check_agent_view` |
+| `agent_create` | Создание агентов | `check_agent_create` |
+| `agent_edit` | Редактирование агентов | `check_agent_edit` |
+| `agent_delete` | Удаление агентов | `check_agent_delete` |
+
+### Уровни проверок
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Уровень 1: Роуты (FastAPI Depends)                        │
+│  ├─ check_can_view_own_tickets                             │
+│  ├─ check_can_view_all_tickets                             │
+│  └─ ...                                                    │
+└─────────────────────────────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│  Уровень 2: Сервисы (проверки внутри методов)              │
+│  ├─ TicketService.list() → can_view_*                      │
+│  ├─ TicketService.get() → can_view_tickets                 │
+│  └─ TicketService.update_ticket() → can_edit_tickets       │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ---

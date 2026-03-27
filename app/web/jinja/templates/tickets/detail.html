@@ -3,6 +3,22 @@
 {% block title %}Тикет {{ ticket.track_id }}{% endblock %}
 
 {% block content %}
+<!-- Навигация -->
+<div class="mb-4">
+  <a href="/tickets" class="btn btn-outline-secondary btn-sm">
+    ← Мои тикеты
+  </a>
+  <a href="/tickets/all" class="btn btn-outline-secondary btn-sm ms-2">
+    📂 Все тикеты
+  </a>
+  <a href="/tickets/unassigned" class="btn btn-outline-secondary btn-sm ms-2">
+    📥 Неназначенные
+  </a>
+  <a href="/tickets/others" class="btn btn-outline-secondary btn-sm ms-2">
+    👥 Чужие тикеты
+  </a>
+</div>
+
 {% if error %}
   <div class="alert alert-danger" role="alert">
     {{ error }}
@@ -362,14 +378,10 @@
               <div>
                 {% if msg.is_internal %}
                   <span class="badge bg-warning text-dark">🔐 Внутренняя заметка</span>
-                {% elif msg.sender_name %}
-                  {% if msg.agent_id %}
-                    <span class="badge bg-info">👤 {{ msg.sender_name }}</span>
-                  {% else %}
-                    <span class="badge bg-success">👤 {{ msg.sender_name }}</span>
-                  {% endif %}
+                {% elif msg.agent_id %}
+                  <span class="badge bg-info">👤 {{ msg.sender_name }}</span>
                 {% else %}
-                  <span class="badge bg-secondary">👤 Неизвестно</span>
+                  <span class="badge bg-success">👤 {{ msg.sender_name }}</span>
                 {% endif %}
               </div>
               <small class="text-muted">

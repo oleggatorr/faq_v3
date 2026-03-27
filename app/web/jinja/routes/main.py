@@ -24,20 +24,29 @@ router = APIRouter(prefix="", tags=["jinja"])
 
 
 @router.get("/", response_class=HTMLResponse)
-def index(request: Request, agent: CurrentAgentOptional):
+def public_home(request: Request, agent: CurrentAgentOptional):
+    """
+    Публичная домашняя страница для неавторизованных.
+    Если авторизован — редирект на /operator/home-page.
+    """
+    if agent:
+        return RedirectResponse(url="/operator/home-page", status_code=303)
+    
     return templates.TemplateResponse(
-        "index.html",
-        {"request": request, "agent": agent},
+        "public_home.html",
+        {"request": request, "agent": None},
     )
 
 
 @router.get("/home-page", response_class=RedirectResponse)
 def home_page(agent: CurrentAgent):
+    """Для авторизованных — редирект на страницу оператора."""
     return RedirectResponse(url="/operator/home-page", status_code=303)
 
 
 @router.get("/operator/home-page", response_class=HTMLResponse)
 def operator_home_page(request: Request, agent: CurrentAgent):
+    """Домашняя страница оператора (требует авторизации)."""
     return templates.TemplateResponse(
         "operator/home_page.html",
         {"request": request, "agent": agent},

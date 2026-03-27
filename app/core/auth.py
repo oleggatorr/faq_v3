@@ -197,6 +197,31 @@ def check_can_view_own_tickets(request: Request, db: Session = Depends(get_db)) 
         raise AccessDeniedError("Нет прав доступа", required_permission="can_view_own_tickets")
     return agent
 
+def check_can_view_all_tickets(request: Request, db: Session = Depends(get_db)) -> AgentRead:
+    """
+    Проверка права на просмотр всех тикетов.
+    Требуется наличие всех трёх прав или админка.
+    """
+    agent = get_current_agent(request, db)
+    if is_admin(agent):
+        return agent
+    
+    # Проверяем все три права
+    missing = []
+    if not has_permission(agent, Permission.can_view_own_tickets):
+        missing.append("can_view_own_tickets")
+    if not has_permission(agent, Permission.can_view_unassigned):
+        missing.append("can_view_unassigned")
+    if not has_permission(agent, Permission.can_view_ass_others):
+        missing.append("can_view_ass_others")
+    
+    if missing:
+        raise AccessDeniedError(
+            f"Нет прав на просмотр всех тикетов. Требуются: {', '.join(missing)}",
+            required_permission="can_view_all_tickets",
+        )
+    return agent
+
 def check_agent_view(request: Request, db: Session = Depends(get_db)) -> AgentRead:
     agent = get_current_agent(request, db)
     if is_admin(agent):

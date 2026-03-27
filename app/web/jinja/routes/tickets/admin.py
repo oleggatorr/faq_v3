@@ -13,6 +13,7 @@ from app.core.auth import (
     check_can_edit_tickets,
     check_can_hard_del_tickets,
     check_can_reply_tickets,
+    check_can_view_all_tickets,
     check_can_view_ass_others,
     check_can_view_own_tickets,
     check_can_view_tickets,
@@ -324,10 +325,10 @@ def tickets_my(
     filters = {"owner_id": agent.id}
 
 
-@router.get("/tickets", response_class=HTMLResponse)
-def tickets_list(
+@router.get("/tickets/all", response_class=HTMLResponse)
+def tickets_all(
     request: Request,
-    agent: AgentRead = Depends(check_can_view_own_tickets),  # Право на просмотр списка тикетов
+    agent: AgentRead = Depends(check_can_view_all_tickets),  # Право на просмотр всех тикетов
     db: Session = Depends(get_db),
     q: str = Query("", description="Quick search by track_id/subject/customer"),
     status_id: str | None = Query(None),
@@ -338,7 +339,8 @@ def tickets_list(
     offset: int = Query(0, ge=0),
     archived: str = Query("active", description="Filter by archived: active, archived, all"),
 ):
-    # Сервис сам проверит права внутри (двойная защита)
+    """Все тикеты (требует права can_view_all_tickets или админ)."""
+    # Передаём agent_id для проверок прав в сервисе
     ticket_service = TicketService(db, agent_id=agent.id)
     category_service = QuestionCategoryService(db)
     status_service = TicketStatusService(db)
@@ -376,6 +378,94 @@ def tickets_list(
     category_name_by_id = {c.id: c.name for c in categories}
     status_name_by_id = {s.id: s.name for s in statuses}
 
+    # Получаем общее количество
+    all_tickets = ticket_service.list(filters=filters if filters else None, limit=999999)
+    total_count = len(all_tickets)
+
+    return templates.TemplateResponse(
+        "tickets/all.html",
+        {
+            "request": request,
+            "tickets": tickets,
+            "agent": agent,
+            "categories": categories,
+            "statuses": statuses,
+            "agents": agents,
+            "category_name_by_id": category_name_by_id,
+            "status_name_by_id": status_name_by_id,
+            "filters": filters,
+            "q": q,
+            "sort_by": sort_by,
+            "sort_desc": sort_desc,
+            "limit": limit,
+            "offset": offset,
+            "archived_filter": archived,
+            "total_count": total_count,
+            **agent.get_permissions_dict(),
+        },
+    )
+
+
+@router.get("/tickets", response_class=HTMLResponse)
+def tickets_list(
+    request: Request,
+    agent: AgentRead = Depends(check_can_view_own_tickets),  # Право на просмотр своих тикетов
+    db: Session = Depends(get_db),
+    q: str = Query("", description="Quick search by track_id/subject/customer"),
+    status_id: str | None = Query(None),
+    category_id: str | None = Query(None),
+    sort_by: str = Query("created_at", description="Sort field"),
+    sort_desc: bool = Query(True, description="Sort descending"),
+    limit: int = Query(50, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    archived: str = Query("active", description="Filter by archived: active, archived, all"),
+):
+    """Список своих тикетов (требует права can_view_own_tickets)."""
+    # Передаём agent_id для проверок прав в сервисе
+    ticket_service = TicketService(db, agent_id=agent.id)
+    category_service = QuestionCategoryService(db)
+    status_service = TicketStatusService(db)
+    agent_service = AgentService(db)
+    filters = _ticket_filters(request)
+
+    # Фильтр: только свои тикеты
+    filters["owner_id"] = agent.id
+
+    # Преобразуем пустые строки в None
+    status_id_int = int(status_id) if status_id and status_id.strip() else None
+    category_id_int = int(category_id) if category_id and category_id.strip() else None
+
+    if status_id_int:
+        filters["status_id"] = status_id_int
+    if category_id_int:
+        filters["category_id"] = category_id_int
+
+    if q and not any(filters.get(k) for k in ("track_id", "subject", "customer_name", "customer_email")):
+        filters["track_id"] = q.strip()
+
+    # Фильтр по архиву
+    if archived == "active":
+        filters["is_archived"] = False
+    elif archived == "archived":
+        filters["is_archived"] = True
+
+    tickets = ticket_service.list(
+        filters=filters if filters else None,
+        sort_by=sort_by,
+        sort_desc=sort_desc,
+        limit=limit,
+        offset=offset,
+    )
+    categories = category_service.list(limit=500)
+    statuses = status_service.list(limit=200)
+    agents = agent_service.list(filters={"is_active": True}, sort_by="full_name", limit=500)
+    category_name_by_id = {c.id: c.name for c in categories}
+    status_name_by_id = {s.id: s.name for s in statuses}
+
+    # Получаем общее количество
+    all_tickets = ticket_service.list(filters=filters if filters else None, limit=999999)
+    total_count = len(all_tickets)
+
     return templates.TemplateResponse(
         "tickets/list.html",
         {
@@ -394,6 +484,7 @@ def tickets_list(
             "limit": limit,
             "offset": offset,
             "archived_filter": archived,
+            "total_count": total_count,
             **agent.get_permissions_dict(),
         },
     )

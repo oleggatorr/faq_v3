@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict
 class MessageBase(BaseModel):
     ticket_id: int
     agent_id: int | None = None
+    sender_name: str | None = None
     customer_name: str | None = None
     customer_email: str | None = None
     subject: str | None = None

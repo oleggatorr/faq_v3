@@ -2,11 +2,27 @@
 
 {% block title %}Чужие тикеты{% endblock %}
 
+{% block extra_css %}
+<style>
+  /* Прижимаем footer к низу */
+  main {
+    min-height: calc(100vh - 120px);
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .content-wrapper {
+    flex: 1;
+  }
+</style>
+{% endblock %}
+
 {% block content %}
+<div class="content-wrapper">
 <div class="page-header">
   <h1 class="page-title">👥 Чужие тикеты</h1>
   <div>
-    <a href="/new-ticket" class="btn btn-primary">
+    <a href="/new-ticket" class="btn btn-outline-secondary ms-2">
       ➕ Создать обращение
     </a>
     <a href="/tickets" class="btn btn-outline-secondary ms-2">
@@ -78,6 +94,8 @@
       </div>
     </div>
     
+
+    
     <!-- Дополнительные настройки -->
     <div class="row g-3 mt-1 pt-3 border-top">
       <div class="col-md-3">
@@ -108,22 +126,28 @@
       </div>
       
       <div class="col-md-2">
-        <label for="limit" class="form-label">Лимит</label>
-        <input 
-          type="number" 
-          class="form-control" 
-          name="limit" 
+        <label for="limit" class="form-label small text-muted mb-1">Лимит</label>
+        <input
+          type="number"
+          class="form-control form-control-sm rounded-1"
+          name="limit"
           id="limit"
-          value="{{ limit }}" 
-          min="1" 
+          value="{{ limit if limit else '10' }}"
+          min="1"
           max="500"
         />
       </div>
-      
-      <div class="col-md-5 d-flex align-items-end">
-        <button type="submit" class="btn btn-primary">
-          Обновить
-        </button>
+
+      <div class="col-md-2">
+        <label for="offset" class="form-label small text-muted mb-1">Смещение</label>
+        <input
+          type="number"
+          class="form-control form-control-sm rounded-1"
+          name="offset"
+          id="offset"
+          value="{{ offset if offset else '0' }}"
+          min="0"
+        />
       </div>
     </div>
   </form>
@@ -366,4 +390,6 @@ function applyChangeStatus() {
   form.submit();
 }
 </script>
+</div>
+</div>
 {% endblock %}

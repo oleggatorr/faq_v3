@@ -91,18 +91,11 @@
                 {% endfor %}
               </select>
             </div>
-            
-            <div class="col-md-6">
-              <label for="priority" class="form-label">Приоритет</label>
-              <select name="priority" id="priority" class="form-select" disabled>
-                <option value="normal" selected>Обычный</option>
-              </select>
-              <small class="text-muted">Приоритет устанавливается оператором</small>
-            </div>
           </div>
 
           <!-- Скрытые поля -->
           <input type="hidden" name="language_id" value="{{ languages|selectattr('code', 'equalto', 'ru')|map(attribute='id')|first|default('') }}" />
+          <input type="hidden" name="priority" value="normal" />
 
           <!-- Сообщение -->
           <div class="mb-4">

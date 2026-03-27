@@ -54,31 +54,45 @@ class AgentRead(AgentBase):
             return set()
         return set(p.strip() for p in self.permissions.split(",") if p.strip())
     
-    def has_permission(self, permission: Permission) -> bool:
+    def has_permission(self, permission: Permission | str) -> bool:
         """
         Проверить наличие права у агента.
         Администратор всегда имеет все права.
+        Принимает как Permission enum, так и строку.
         """
         # Админ всегда имеет все права (сравниваем и со строкой, и с AgentRole)
         if self.role == AgentRole.admin or str(self.role) == "admin":
             return True
-        return permission.value in self._get_permissions_set()
-    
-    def has_any_permission(self, *permissions: Permission) -> bool:
+        
+        # Получаем значение права (из enum или строки)
+        perm_value = permission.value if hasattr(permission, 'value') else str(permission)
+        return perm_value in self._get_permissions_set()
+
+    def has_any_permission(self, *permissions: Permission | str) -> bool:
         """Проверить наличие хотя бы одного из указанных прав."""
         # Админ всегда имеет все права
         if self.role == AgentRole.admin or str(self.role) == "admin":
             return True
         user_perms = self._get_permissions_set()
-        return any(p.value in user_perms for p in permissions)
+        
+        for perm in permissions:
+            perm_value = perm.value if hasattr(perm, 'value') else str(perm)
+            if perm_value in user_perms:
+                return True
+        return False
 
-    def has_all_permissions(self, *permissions: Permission) -> bool:
+    def has_all_permissions(self, *permissions: Permission | str) -> bool:
         """Проверить наличие всех указанных прав."""
         # Админ всегда имеет все права
         if self.role == AgentRole.admin or str(self.role) == "admin":
             return True
         user_perms = self._get_permissions_set()
-        return all(p.value in user_perms for p in permissions)
+        
+        for perm in permissions:
+            perm_value = perm.value if hasattr(perm, 'value') else str(perm)
+            if perm_value not in user_perms:
+                return False
+        return True
 
     def get_permissions_dict(self) -> dict[str, bool]:
         """

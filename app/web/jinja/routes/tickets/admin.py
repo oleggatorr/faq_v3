@@ -28,9 +28,10 @@ from app.models.ticket import Priority
 from app.models.ticket_event import TicketEvent
 from app.schemas.agent import AgentRead
 from app.schemas.message import MessageCreate
-from app.schemas.ticket import TicketUpdate
+from app.schemas.ticket import TicketCreate, TicketUpdate
 from app.services.agent_service import AgentService
 from app.services.audit_log_service import AuditLogService
+from app.services.department_service import DepartmentService
 from app.services.question_category_service import QuestionCategoryService
 from app.services.errors import NotFound
 from app.services.file_storage_service import FileStorageError, FileStorageService
@@ -150,11 +151,15 @@ def tickets_unassigned(
     category_id: str | None = Query(None),
     sort_by: str = Query("created_at", description="Sort field"),
     sort_desc: bool = Query(True, description="Sort descending"),
-    limit: int = Query(50, ge=1, le=500),
-    offset: int = Query(0, ge=0),
+    limit: str | None = Query(None),
+    offset: str | None = Query(None),
     archived: str = Query("active", description="Filter by archived: active, archived, all"),
 ):
     """Неназначенные тикеты (требует права can_view_unassigned)."""
+    # Обработка пустых значений
+    limit_int = int(limit) if limit and limit.strip() else 10
+    offset_int = int(offset) if offset and offset.strip() else 0
+    
     # Передаём agent_id для проверок прав в сервисе
     ticket_service = TicketService(db, agent_id=agent.id)
     category_service = QuestionCategoryService(db)
@@ -184,8 +189,8 @@ def tickets_unassigned(
         filters=filters,
         sort_by=sort_by,
         sort_desc=sort_desc,
-        limit=limit,
-        offset=offset,
+        limit=limit_int,
+        offset=offset_int,
     )
     categories = category_service.list(limit=500)
     statuses = status_service.list(limit=200)
@@ -228,11 +233,15 @@ def tickets_others(
     category_id: str | None = Query(None),
     sort_by: str = Query("created_at", description="Sort field"),
     sort_desc: bool = Query(True, description="Sort descending"),
-    limit: int = Query(50, ge=1, le=500),
-    offset: int = Query(0, ge=0),
+    limit: str | None = Query(None),
+    offset: str | None = Query(None),
     archived: str = Query("active", description="Filter by archived: active, archived, all"),
 ):
     """Тикеты, назначенные другим агентам (требует права can_view_ass_others)."""
+    # Обработка пустых значений
+    limit_int = int(limit) if limit and limit.strip() else 10
+    offset_int = int(offset) if offset and offset.strip() else 0
+    
     # Передаём agent_id для проверок прав в сервисе
     ticket_service = TicketService(db, agent_id=agent.id)
     category_service = QuestionCategoryService(db)
@@ -262,8 +271,8 @@ def tickets_others(
         filters=filters,
         sort_by=sort_by,
         sort_desc=sort_desc,
-        limit=limit,
-        offset=offset,
+        limit=limit_int,
+        offset=offset_int,
     )
     # Фильтруем тикеты, назначенные другим (не текущему агенту и не None)
     tickets = [t for t in tickets if t.owner_id and t.owner_id != agent.id]
@@ -310,11 +319,15 @@ def tickets_my(
     category_id: str | None = Query(None),
     sort_by: str = Query("created_at", description="Sort field"),
     sort_desc: bool = Query(True, description="Sort descending"),
-    limit: int = Query(50, ge=1, le=500),
-    offset: int = Query(0, ge=0),
+    limit: str | None = Query(None),
+    offset: str | None = Query(None),
     archived: str = Query("active", description="Filter by archived: active, archived, all"),
 ):
     """Тикеты, назначенные текущему агенту (требует права can_view_tickets)."""
+    # Обработка пустых значений
+    limit_int = int(limit) if limit and limit.strip() else 10
+    offset_int = int(offset) if offset and offset.strip() else 0
+    
     # Передаём agent_id для проверок прав в сервисе
     ticket_service = TicketService(db, agent_id=agent.id)
     category_service = QuestionCategoryService(db)
@@ -335,11 +348,15 @@ def tickets_all(
     category_id: str | None = Query(None),
     sort_by: str = Query("created_at", description="Sort field"),
     sort_desc: bool = Query(True, description="Sort descending"),
-    limit: int = Query(50, ge=1, le=500),
-    offset: int = Query(0, ge=0),
+    limit: str | None = Query(None),
+    offset: str | None = Query(None),
     archived: str = Query("active", description="Filter by archived: active, archived, all"),
 ):
     """Все тикеты (требует права can_view_all_tickets или админ)."""
+    # Обработка пустых значений
+    limit_int = int(limit) if limit and limit.strip() else 10
+    offset_int = int(offset) if offset and offset.strip() else 0
+    
     # Передаём agent_id для проверок прав в сервисе
     ticket_service = TicketService(db, agent_id=agent.id)
     category_service = QuestionCategoryService(db)
@@ -369,8 +386,8 @@ def tickets_all(
         filters=filters if filters else None,
         sort_by=sort_by,
         sort_desc=sort_desc,
-        limit=limit,
-        offset=offset,
+        limit=limit_int,
+        offset=offset_int,
     )
     categories = category_service.list(limit=500)
     statuses = status_service.list(limit=200)
@@ -416,11 +433,15 @@ def tickets_list(
     category_id: str | None = Query(None),
     sort_by: str = Query("created_at", description="Sort field"),
     sort_desc: bool = Query(True, description="Sort descending"),
-    limit: int = Query(50, ge=1, le=500),
-    offset: int = Query(0, ge=0),
+    limit: str | None = Query(None),
+    offset: str | None = Query(None),
     archived: str = Query("active", description="Filter by archived: active, archived, all"),
 ):
     """Список своих тикетов (требует права can_view_own_tickets)."""
+    # Обработка пустых значений
+    limit_int = int(limit) if limit and limit.strip() else 10
+    offset_int = int(offset) if offset and offset.strip() else 0
+    
     # Передаём agent_id для проверок прав в сервисе
     ticket_service = TicketService(db, agent_id=agent.id)
     category_service = QuestionCategoryService(db)
@@ -453,8 +474,8 @@ def tickets_list(
         filters=filters if filters else None,
         sort_by=sort_by,
         sort_desc=sort_desc,
-        limit=limit,
-        offset=offset,
+        limit=limit_int,
+        offset=offset_int,
     )
     categories = category_service.list(limit=500)
     statuses = status_service.list(limit=200)

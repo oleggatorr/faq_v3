@@ -2,11 +2,27 @@
 
 {% block title %}Неназначенные тикеты{% endblock %}
 
+{% block extra_css %}
+<style>
+  /* Прижимаем footer к низу */
+  main {
+    min-height: calc(100vh - 120px);
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .content-wrapper {
+    flex: 1;
+  }
+</style>
+{% endblock %}
+
 {% block content %}
+<div class="content-wrapper">
 <div class="page-header">
   <h1 class="page-title">📥 Неназначенные тикеты</h1>
   <div>
-    <a href="/new-ticket" class="btn btn-primary">
+    <a href="/new-ticket" class="btn btn-outline-secondary ms-2">
       ➕ Создать обращение
     </a>
     <a href="/tickets" class="btn btn-outline-secondary ms-2">
@@ -77,55 +93,65 @@
         </a>
       </div>
     </div>
-    
-    <!-- Дополнительные настройки -->
-    <div class="row g-3 mt-1 pt-3 border-top">
-      <div class="col-md-3">
-        <label for="sort_by" class="form-label">Сортировка</label>
-        <select name="sort_by" id="sort_by" class="form-select">
-          {% for f in ["id", "track_id", "created_at", "updated_at", "status_id", "priority"] %}
-            <option value="{{ f }}" {% if sort_by == f %}selected{% endif %}>
-              {{ f }}
-            </option>
-          {% endfor %}
-        </select>
-      </div>
-      
-      <div class="col-md-2 d-flex align-items-end">
-        <div class="form-check">
-          <input 
-            type="checkbox" 
-            class="form-check-input" 
-            name="sort_desc" 
-            value="true" 
-            id="sort_desc"
-            {% if sort_desc %}checked{% endif %}
+    <details class="mt-3">
+      <summary class="text-muted small" style="cursor: pointer;">
+        ⚙️ Дополнительные настройки
+      </summary>
+      <!-- Дополнительные настройки -->
+      <div class="row g-3 mt-1 pt-3 border-top">
+        <div class="col-md-3">
+          <label for="sort_by" class="form-label">Сортировка</label>
+          <select name="sort_by" id="sort_by" class="form-select">
+            {% for f in ["id", "track_id", "created_at", "updated_at", "status_id", "priority"] %}
+              <option value="{{ f }}" {% if sort_by == f %}selected{% endif %}>
+                {{ f }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+        
+        <div class="col-md-2 d-flex align-items-end">
+          <div class="form-check">
+            <input 
+              type="checkbox" 
+              class="form-check-input" 
+              name="sort_desc" 
+              value="true" 
+              id="sort_desc"
+              {% if sort_desc %}checked{% endif %}
+            />
+            <label class="form-check-label" for="sort_desc">
+              По убыванию
+            </label>
+          </div>
+        </div>
+        
+        <div class="col-md-2">
+          <label for="limit" class="form-label small text-muted mb-1">Лимит</label>
+          <input
+            type="number"
+            class="form-control form-control-sm rounded-1"
+            name="limit"
+            id="limit"
+            value="{{ limit if limit else '10' }}"
+            min="1"
+            max="500"
           />
-          <label class="form-check-label" for="sort_desc">
-            По убыванию
-          </label>
+        </div>
+
+        <div class="col-md-2">
+          <label for="offset" class="form-label small text-muted mb-1">Смещение</label>
+          <input
+            type="number"
+            class="form-control form-control-sm rounded-1"
+            name="offset"
+            id="offset"
+            value="{{ offset if offset else '0' }}"
+            min="0"
+          />
         </div>
       </div>
-      
-      <div class="col-md-2">
-        <label for="limit" class="form-label">Лимит</label>
-        <input 
-          type="number" 
-          class="form-control" 
-          name="limit" 
-          id="limit"
-          value="{{ limit }}" 
-          min="1" 
-          max="500"
-        />
-      </div>
-      
-      <div class="col-md-5 d-flex align-items-end">
-        <button type="submit" class="btn btn-primary">
-          Обновить
-        </button>
-      </div>
-    </div>
+    </details>
   </form>
 </div>
 
@@ -366,4 +392,6 @@ function applyChangeStatus() {
   form.submit();
 }
 </script>
+</div>
+</div>
 {% endblock %}

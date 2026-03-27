@@ -4,13 +4,13 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{% block title %}Admin{% endblock %}</title>
-    
+
     {# Bootstrap 5 CSS #}
     <link href="/static/vendor/bootstrap/bootstrap.min.css" rel="stylesheet" />
-    
+
     {# Custom styles #}
     <link rel="stylesheet" href="/static/css/app.css" />
-    
+
     {% block extra_css %}{% endblock %}
   </head>
   <body>
@@ -18,7 +18,7 @@
     <header>
       {% include 'partials/_navbar.html' %}
     </header>
-    
+
     {# Main content #}
     <main class="py-4">
       <div class="container-fluid px-4">
@@ -26,12 +26,12 @@
         {% block alerts %}
           {% include 'partials/_flash.html' %}
         {% endblock %}
-        
+
         {# Page content #}
         {% block content %}{% endblock %}
       </div>
     </main>
-    
+
     {# Footer #}
     <footer class="border-top py-3 mt-auto">
       <div class="container-fluid px-4">
@@ -40,13 +40,38 @@
         </p>
       </div>
     </footer>
-    
+
     {# Bootstrap 5 JS Bundle #}
     <script src="/static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
-    
+
     {# Custom scripts #}
     <script src="/static/js/app.js"></script>
     
+    <script>
+      // Переключатель языков (заглушка)
+      document.addEventListener('DOMContentLoaded', function() {
+        const langLinks = document.querySelectorAll('[data-lang]');
+        const langDropdown = document.getElementById('langDropdown');
+        
+        langLinks.forEach(function(link) {
+          link.addEventListener('click', function(e) {
+            e.preventDefault();
+            const lang = this.getAttribute('data-lang');
+            const langName = this.textContent.trim();
+            
+            // Обновляем текст кнопки
+            if (langDropdown) {
+              langDropdown.innerHTML = '🌐 ' + langName;
+            }
+            
+            // Здесь будет логика переключения языка
+            console.log('Переключение на язык:', lang);
+            // TODO: Реализовать переключение языка
+          });
+        });
+      });
+    </script>
+
     {% block extra_js %}{% endblock %}
   </body>
 </html>

@@ -166,6 +166,25 @@
             </div>
           </div>
 
+          <!-- Email уведомления -->
+          <div class="mb-4">
+            <div class="form-check form-switch">
+              <input
+                class="form-check-input"
+                type="checkbox"
+                name="email_notifications"
+                id="email_notifications"
+                {% if target_agent.email_notifications %}checked{% endif %}
+              />
+              <label class="form-check-label" for="email_notifications">
+                <strong>📧 Email-уведомления</strong>
+              </label>
+              <small class="form-text text-muted d-block">
+                Отправлять уведомления на email о новых тикетах и сообщениях
+              </small>
+            </div>
+          </div>
+
           <!-- Категории вопросов -->
           <div id="category_block" class="mb-4">
             <h5 class="mb-3">📁 Доступ к категориям вопросов</h5>

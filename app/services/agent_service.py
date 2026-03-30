@@ -34,6 +34,7 @@ class AgentService:
             phone=agent_data.phone,
             avatar_path=agent_data.avatar_path,
             auto_assign=agent_data.auto_assign,
+            email_notifications=agent_data.email_notifications,
             signature=agent_data.signature,
         )
         self.session.add(agent)
@@ -71,6 +72,7 @@ class AgentService:
             "search",  # Специальный параметр для поиска по login + full_name
             "category_id",  # Фильтр по категории (вхождение в category_access)
             "auto_assign",  # Фильтр по автоназначению
+            "email_notifications",  # Фильтр по email-уведомлениям
         }
         allowed_sort = {
             "id",
@@ -84,6 +86,7 @@ class AgentService:
             "created_at",
             "updated_at",
             "auto_assign",
+            "email_notifications",
         }
 
         if filters:

@@ -53,6 +53,9 @@ class AgentCreateService(AgentBaseService):
             "category_access": agent_data.category_access or "",
             "permissions": agent_data.permissions or "",
             "is_active": agent_data.is_active if agent_data.is_active is not None else True,
+            "auto_assign": agent_data.auto_assign if agent_data.auto_assign is not None else True,
+            "email_notifications": agent_data.email_notifications if agent_data.email_notifications is not None else True,
+            "signature": agent_data.signature,
         }
         
         # Добавляем login если есть
@@ -78,6 +81,9 @@ class AgentCreateService(AgentBaseService):
         category_access: str = "",
         permissions: str = "",
         is_active: bool = True,
+        auto_assign: bool = True,
+        email_notifications: bool = True,
+        signature: str | None = None,
         created_by_agent_id: int | None = None,
     ) -> AgentRead:
         """
@@ -86,7 +92,7 @@ class AgentCreateService(AgentBaseService):
         """
         # Хэширование пароля
         password_hash = hash_password(password)
-        
+
         agent_data = AgentCreate(
             email=email,
             full_name=full_name,
@@ -98,8 +104,11 @@ class AgentCreateService(AgentBaseService):
             category_access=category_access,
             permissions=permissions,
             is_active=is_active,
+            auto_assign=auto_assign,
+            email_notifications=email_notifications,
+            signature=signature,
         )
-        
+
         return self.create(agent_data, created_by_agent_id)
     
     def create_with_defaults(

@@ -28,6 +28,7 @@ class Agent(Base):
     phone = Column(String(50), nullable=True)
     avatar_path = Column(String(500), nullable=True)
     auto_assign = Column(Boolean, default=True, nullable=False, index=True)
+    email_notifications = Column(Boolean, default=True, nullable=False)
     signature = Column(Text, nullable=True)
 
     last_login_at = Column(DateTime(timezone=True), nullable=True, index=True)

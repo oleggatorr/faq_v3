@@ -43,20 +43,14 @@ class OperatorCategoryService:
         only_auto_assign: bool = False,
         department_id: Optional[int] = None,
         limit: Optional[int] = None,
+        random: bool = False,
     ) -> list[OperatorWithScore]:
         """
         Получить список операторов, которые могут работать с категорией.
-        
-        Args:
-            category_id: ID категории
-            include_inactive: Включая неактивных операторов
-            only_auto_assign: Только операторы с включённым auto_assign
-            department_id: Фильтр по департаменту (опционально)
-            limit: Ограничение количества результатов
-        
-        Returns:
-            Список OperatorWithScore, отсортированный по score (убывание)
         """
+        # Очищаем кэш сессии чтобы получить свежие данные
+        self.session.expire_all()
+        
         query = self.session.query(Agent)
         
         # Фильтр по роли (только операторы и админы)
@@ -86,13 +80,11 @@ class OperatorCategoryService:
                 agent.category_access, category_id
             )
             
-            # Вычисляем score
-            if is_admin:
-                score = 100  # Админы всегда имеют максимальный приоритет
-            elif has_explicit_access:
-                score = 10  # Операторы с явным доступом
+            # Вычисляем score — ТЕПЕРЬ ВСЕ РАВНЫ (10 баллов если есть доступ)
+            if is_admin or has_explicit_access:
+                score = 10  # Админы и операторы с доступом — равные шансы
             else:
-                score = 0  # Нет доступа
+                score = 0  # Нет доступа к категории
             
             # Получаем название департамента
             department_name = None
@@ -108,8 +100,13 @@ class OperatorCategoryService:
             )
             result.append(operator_with_score)
         
-        # Сортируем по score (убывание), затем по full_name
-        result.sort(key=lambda x: (-x.score, x.agent.full_name))
+        # Сортируем по score (убывание), затем случайно внутри одной группы
+        import random as rnd
+        if random:
+            # Перемешиваем операторов с одинаковым score
+            rnd.shuffle(result)
+        else:
+            result.sort(key=lambda x: (-x.score, x.agent.full_name))
         
         # Применяем limit
         if limit is not None:

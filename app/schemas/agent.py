@@ -20,6 +20,7 @@ class AgentBase(BaseModel):
     phone: str | None = None
     avatar_path: str | None = None
     auto_assign: bool = True
+    email_notifications: bool = True
     signature: str | None = None
 
 
@@ -40,6 +41,7 @@ class AgentUpdate(BaseModel):
     phone: str | None = None
     avatar_path: str | None = None
     auto_assign: bool | None = None
+    email_notifications: bool | None = None
     signature: str | None = None
     last_login_at: datetime | None = None
 

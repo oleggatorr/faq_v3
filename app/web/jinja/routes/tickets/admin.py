@@ -1205,3 +1205,72 @@ def get_tickets_with_unread(
         "count": len(tickets_with_unread),
         "tickets": tickets_with_unread,
     }
+
+
+@router.get("/tickets/{ticket_id}/available-operators")
+def get_available_operators(
+    ticket_id: int,
+    agent: AgentRead = Depends(check_can_view_tickets),
+    db: Session = Depends(get_db),
+    random: bool = Query(False, description="Вернуть случайного оператора"),
+):
+    """
+    Получить список операторов, доступных для назначения на тикет.
+    
+    Операторы отбираются по категории вопроса, совпадающей с категорией тикета.
+    Возвращает операторов с score (приоритетом назначения).
+    
+    ?random=true — вернуть одного случайного оператора
+    """
+    from app.services.ticket.assignment_service import AssignmentService
+    from app.models.ticket import Ticket
+    
+    # Проверяем, что тикет существует
+    ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
+    if ticket is None:
+        raise HTTPException(status_code=404, detail="Тикет не найден")
+    
+    # Получаем доступных операторов (ищем по категории, НЕ по департаменту)
+    assignment_service = AssignmentService(db)
+    operators = assignment_service.get_available_operators(
+        category_id=ticket.category_id,
+        department_id=None,  # НЕ фильтруем по департаменту
+        only_auto_assign=False,
+        include_inactive=False,
+        limit=None,  # Сначала получаем всех
+        random=False,  # Сами перемешаем после фильтрации
+    )
+    
+    # Сначала фильтруем только операторов с доступом (score > 0)
+    suitable_operators = [op for op in operators if op.score > 0]
+    
+    # Теперь перемешиваем и берём одного случайного
+    if random and suitable_operators:
+        import random as rnd
+        rnd.shuffle(suitable_operators)
+        suitable_operators = suitable_operators[:1]
+    
+    # Формируем ответ
+    return {
+        "ticket_id": ticket_id,
+        "category_id": ticket.category_id,
+        "department_id": ticket.department_id,
+        "random": random,
+        "count": len(suitable_operators),
+        "operators": [
+            {
+                "id": op.agent.id,
+                "full_name": op.agent.full_name,
+                "email": op.agent.email,
+                "login": op.agent.login,
+                "role": op.agent.role.value,
+                "score": op.score,
+                "has_explicit_access": op.has_explicit_access,
+                "is_admin": op.is_admin,
+                "department_name": op.department_name,
+                "auto_assign": op.agent.auto_assign,
+                "email_notifications": op.agent.email_notifications,
+            }
+            for op in suitable_operators
+        ],
+    }

@@ -131,8 +131,8 @@ def add_agent_submit(
     full_name: str = Form(...),
     login: str = Form(...),
     email: str = Form(...),
-    password: str = Form(...),
-    password_confirm: str = Form(...),
+    password: str = Form(None),
+    password_confirm: str = Form(None),
     role: str = Form(...),
     department_id: int = Form(...),
     category_access: list[str] = Form(default=[]),
@@ -140,9 +140,49 @@ def add_agent_submit(
     phone: str | None = Form(None),
     is_active: str = Form("off"),
     auto_assign: str = Form("off"),
+    email_notifications: str = Form("off"),
 ):
     # Используем новый сервис для создания
     create_service = AgentCreateService(db, current_agent_id=agent.id)
+
+    # Проверка на пустой пароль
+    if not password or not password.strip():
+        categories = db.query(QuestionCategory).filter(
+            QuestionCategory.is_active == True
+        ).order_by(QuestionCategory.name).all()
+        dept_service = DepartmentService(db)
+        departments = dept_service.list(
+            filters={"is_active": True},
+            sort_by="name",
+            limit=200,
+        )
+        return templates.TemplateResponse(
+            "agents/add.html",
+            {
+                "request": request,
+                "agent": agent,
+                "error": "Пароль обязателен",
+                "categories": categories,
+                "departments": departments,
+                "permissions_list": list(Permission),
+                "permission_labels": PERMISSION_LABELS,
+                "permission_groups": PERMISSION_GROUPS,
+                "form_data": {
+                    "full_name": full_name,
+                    "login": login,
+                    "email": email,
+                    "role": role,
+                    "department_id": department_id,
+                    "phone": phone,
+                    "category_access": category_access,
+                    "permissions": permissions,
+                    "is_active": is_active == "on",
+                    "auto_assign": auto_assign == "on",
+                    "email_notifications": email_notifications == "on",
+                },
+            },
+            status_code=400,
+        )
 
     # Проверка совпадения паролей
     if password != password_confirm:
@@ -165,6 +205,7 @@ def add_agent_submit(
                 "departments": departments,
                 "permissions_list": list(Permission),
                 "permission_labels": PERMISSION_LABELS,
+                "permission_groups": PERMISSION_GROUPS,
                 "form_data": {
                     "full_name": full_name,
                     "login": login,
@@ -176,6 +217,7 @@ def add_agent_submit(
                     "permissions": permissions,
                     "is_active": is_active == "on",
                     "auto_assign": auto_assign == "on",
+                    "email_notifications": email_notifications == "on",
                 },
             },
             status_code=400,
@@ -212,6 +254,7 @@ def add_agent_submit(
                 "departments": departments,
                 "permissions_list": list(Permission),
                 "permission_labels": PERMISSION_LABELS,
+                "permission_groups": PERMISSION_GROUPS,
                 "form_data": {
                     "full_name": full_name,
                     "login": login,
@@ -223,6 +266,7 @@ def add_agent_submit(
                     "permissions": permissions,
                     "is_active": is_active == "on",
                     "auto_assign": auto_assign == "on",
+                    "email_notifications": email_notifications == "on",
                 },
             },
             status_code=400,
@@ -250,6 +294,7 @@ def add_agent_submit(
             permissions=permissions_str,
             is_active=(is_active == "on"),
             auto_assign=(auto_assign == "on"),
+            email_notifications=(email_notifications == "on"),
             created_by_agent_id=agent.id,
         )
 
@@ -296,6 +341,7 @@ def add_agent_submit(
                 "departments": departments,
                 "permissions_list": list(Permission),
                 "permission_labels": PERMISSION_LABELS,
+                "permission_groups": PERMISSION_GROUPS,
                 "form_data": {
                     "full_name": full_name,
                     "login": login,
@@ -307,6 +353,7 @@ def add_agent_submit(
                     "permissions": permissions,
                     "is_active": is_active == "on",
                     "auto_assign": auto_assign == "on",
+                    "email_notifications": email_notifications == "on",
                 },
             },
             status_code=400,
@@ -331,6 +378,7 @@ def add_agent_submit(
                 "departments": departments,
                 "permissions_list": list(Permission),
                 "permission_labels": PERMISSION_LABELS,
+                "permission_groups": PERMISSION_GROUPS,
                 "form_data": {
                     "full_name": full_name,
                     "login": login,
@@ -342,6 +390,7 @@ def add_agent_submit(
                     "permissions": permissions,
                     "is_active": is_active == "on",
                     "auto_assign": auto_assign == "on",
+                    "email_notifications": email_notifications == "on",
                 },
                 **agent.get_permissions_dict(),
             },
@@ -413,6 +462,7 @@ def edit_agent_submit(
     phone: str | None = Form(None),
     is_active: str = Form("off"),
     auto_assign: str = Form("off"),
+    email_notifications: str = Form("off"),
 ):
     # Используем новый сервис для редактирования
     edit_service = AgentEditService(db, current_agent_id=agent.id)
@@ -472,6 +522,7 @@ def edit_agent_submit(
             "phone": phone.strip() if phone else None,
             "is_active": (is_active == "on"),
             "auto_assign": (auto_assign == "on"),
+            "email_notifications": (email_notifications == "on"),
         }
 
         # Пароль добавляем только если указан

@@ -119,9 +119,7 @@ class TicketService(TicketBaseService):
             ticket_id=ticket.id,
             agent_id=None,
             sender_name=ticket.customer_name,  # ФИО отправителя = имя клиента
-            customer_name=ticket.customer_name,
             customer_email=ticket.customer_email,
-            subject=ticket.subject,
             body=first_message_body,
             is_internal=False,
             is_automatic=False,

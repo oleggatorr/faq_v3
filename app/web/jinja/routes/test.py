@@ -52,3 +52,23 @@ def test_unread_messages(
             "tickets_with_unread": tickets_with_unread,
         },
     )
+
+
+@router.get("/assignment", response_class=HTMLResponse)
+def test_assignment(
+    request: Request,
+    agent: CurrentAgent,
+    db: Session = Depends(get_db),
+):
+    """
+    Тестовая страница для проверки автоназначения операторов.
+    
+    Показывает список операторов, доступных для назначения на тикет.
+    """
+    return templates.TemplateResponse(
+        "test/assignment.html",
+        {
+            "request": request,
+            "agent": agent,
+        },
+    )

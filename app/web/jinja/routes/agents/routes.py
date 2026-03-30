@@ -138,6 +138,8 @@ def add_agent_submit(
     category_access: list[str] = Form(default=[]),
     permissions: list[str] = Form(default=[]),
     phone: str | None = Form(None),
+    is_active: str = Form("off"),
+    auto_assign: str = Form("off"),
 ):
     # Используем новый сервис для создания
     create_service = AgentCreateService(db, current_agent_id=agent.id)
@@ -172,6 +174,8 @@ def add_agent_submit(
                     "phone": phone,
                     "category_access": category_access,
                     "permissions": permissions,
+                    "is_active": is_active == "on",
+                    "auto_assign": auto_assign == "on",
                 },
             },
             status_code=400,
@@ -217,6 +221,8 @@ def add_agent_submit(
                     "phone": phone,
                     "category_access": category_access,
                     "permissions": permissions,
+                    "is_active": is_active == "on",
+                    "auto_assign": auto_assign == "on",
                 },
             },
             status_code=400,
@@ -242,7 +248,8 @@ def add_agent_submit(
             phone=phone.strip() if phone else None,
             category_access=category_access_str,
             permissions=permissions_str,
-            is_active=True,
+            is_active=(is_active == "on"),
+            auto_assign=(auto_assign == "on"),
             created_by_agent_id=agent.id,
         )
 
@@ -298,6 +305,8 @@ def add_agent_submit(
                     "phone": phone,
                     "category_access": category_access,
                     "permissions": permissions,
+                    "is_active": is_active == "on",
+                    "auto_assign": auto_assign == "on",
                 },
             },
             status_code=400,
@@ -331,6 +340,8 @@ def add_agent_submit(
                     "phone": phone,
                     "category_access": category_access,
                     "permissions": permissions,
+                    "is_active": is_active == "on",
+                    "auto_assign": auto_assign == "on",
                 },
                 **agent.get_permissions_dict(),
             },
@@ -400,7 +411,8 @@ def edit_agent_submit(
     category_access: list[str] = Form(default=[]),
     permissions: list[str] = Form(default=[]),
     phone: str | None = Form(None),
-    is_active: bool = Form(False),
+    is_active: str = Form("off"),
+    auto_assign: str = Form("off"),
 ):
     # Используем новый сервис для редактирования
     edit_service = AgentEditService(db, current_agent_id=agent.id)
@@ -458,7 +470,8 @@ def edit_agent_submit(
             "category_access": category_access_str,
             "permissions": permissions_str,
             "phone": phone.strip() if phone else None,
-            "is_active": is_active,
+            "is_active": (is_active == "on"),
+            "auto_assign": (auto_assign == "on"),
         }
 
         # Пароль добавляем только если указан

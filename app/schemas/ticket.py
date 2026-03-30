@@ -62,5 +62,6 @@ class TicketRead(TicketBase):
     id: int
     created_at: datetime | None = None
     updated_at: datetime | None = None
+    unread_count: int | None = None
 
     model_config = ConfigDict(from_attributes=True)

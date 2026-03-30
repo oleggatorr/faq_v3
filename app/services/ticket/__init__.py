@@ -11,6 +11,7 @@ from app.services.ticket.ticket_service import TicketService
 from app.services.ticket.ticket_event_service import TicketEventService
 from app.services.ticket.message_service import MessageService
 from app.services.ticket.attachment_service import AttachmentService
+from app.services.ticket.read_state_service import TicketReadStateService
 
 __all__ = [
     "TicketBaseService",
@@ -18,4 +19,5 @@ __all__ = [
     "TicketEventService",
     "MessageService",
     "AttachmentService",
+    "TicketReadStateService",
 ]

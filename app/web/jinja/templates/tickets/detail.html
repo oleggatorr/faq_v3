@@ -379,9 +379,9 @@
                 {% if msg.is_internal %}
                   <span class="badge bg-warning text-dark">🔐 Внутренняя заметка</span>
                 {% elif msg.agent_id %}
-                  <span class="badge bg-info">👤 {{ msg.sender_name }}</span>
+                  <span class="badge bg-info">👤 {{ msg.sender_name|default('Агент', true) }}</span>
                 {% else %}
-                  <span class="badge bg-success">👤 {{ msg.sender_name }}</span>
+                  <span class="badge bg-success">👤 {{ msg.sender_name|default('Клиент', true) }}</span>
                 {% endif %}
               </div>
               <small class="text-muted">

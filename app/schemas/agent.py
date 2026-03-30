@@ -19,6 +19,8 @@ class AgentBase(BaseModel):
     is_active: bool = True
     phone: str | None = None
     avatar_path: str | None = None
+    auto_assign: bool = True
+    signature: str | None = None
 
 
 class AgentCreate(AgentBase):
@@ -37,6 +39,8 @@ class AgentUpdate(BaseModel):
     is_active: bool | None = None
     phone: str | None = None
     avatar_path: str | None = None
+    auto_assign: bool | None = None
+    signature: str | None = None
     last_login_at: datetime | None = None
 
 

@@ -27,6 +27,9 @@ class Agent(Base):
     is_active = Column(Boolean, default=True, nullable=False, index=True)
     phone = Column(String(50), nullable=True)
     avatar_path = Column(String(500), nullable=True)
+    auto_assign = Column(Boolean, default=True, nullable=False, index=True)
+    signature = Column(Text, nullable=True)
+
     last_login_at = Column(DateTime(timezone=True), nullable=True, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

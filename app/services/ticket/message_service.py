@@ -56,15 +56,12 @@ class MessageService:
 
         if agent_id is None:
             # Сообщение от клиента
-            customer_name = ticket.customer_name
             customer_email = ticket.customer_email
             sender_name = ticket.customer_name  # ФИО отправителя = имя клиента
-            print(f"DEBUG: Client message - ticket.customer_name={repr(ticket.customer_name)}, sender_name={repr(sender_name)}")
         else:
             # Сообщение от агента
             from app.models.agent import Agent
             agent = self.session.query(Agent).filter(Agent.id == agent_id).one_or_none()
-            customer_name = None
             customer_email = None
             sender_name = agent.full_name if agent else None  # ФИО отправителя = ФИО агента
 
@@ -72,9 +69,7 @@ class MessageService:
             ticket_id=message_data.ticket_id,
             agent_id=agent_id,
             sender_name=sender_name,  # Заполняем ФИО отправителя
-            customer_name=customer_name,
             customer_email=customer_email,
-            subject=message_data.subject,
             body=message_data.body,
             is_internal=message_data.is_internal,
             is_automatic=message_data.is_automatic,
@@ -202,9 +197,7 @@ class MessageService:
             "id",
             "ticket_id",
             "agent_id",
-            "customer_name",
             "customer_email",
-            "subject",
             "is_internal",
             "is_automatic",
             "ip_address",
@@ -228,7 +221,7 @@ class MessageService:
             query,
             Message,
             filters=filters,
-            text_like_fields={"customer_name", "customer_email", "subject"},
+            text_like_fields={"customer_email"},
         )
         query = apply_sort(
             query,

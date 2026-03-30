@@ -41,6 +41,7 @@ from app.services.ticket import (
     TicketEventService,
     MessageService,
     AttachmentService,
+    TicketReadStateService,
 )
 
 from ..main import templates
@@ -91,8 +92,12 @@ async def create_ticket_submit(
     
     category_id_int = _parse_int(category_id) if category_id else None
     customer_ip = request.client.host if request.client else "0.0.0.0"
-    
-    ticket_service = TicketService(db, ticket_event_service=TicketEventService(db))
+
+    ticket_service = TicketService(
+        db,
+        ticket_event_service=TicketEventService(db),
+        ticket_read_state_service=TicketReadStateService(db),
+    )
     
     try:
         track_id = ticket_service.generate_track_id()
@@ -534,6 +539,14 @@ def ticket_detail_admin(
             status_code=404,
         )
 
+    # === Автоматически отмечаем сообщения как прочитанные ===
+    # Если текущий агент является владельцем тикета
+    if ticket.owner_id == agent.id:
+        from app.services.ticket.read_state_service import TicketReadStateService
+        read_state_service = TicketReadStateService(db)
+        read_state_service.mark_as_read(ticket_id=ticket_id)
+    # ===========================================================
+
     message_service = MessageService(db)
     messages = message_service.list(
         filters={"ticket_id": ticket.id},
@@ -701,7 +714,12 @@ def admin_update_ticket(
     is_archived: str = Form("false"),
 ):
     # Сервис сам проверит права внутри (двойная защита)
-    ticket_service = TicketService(db, agent_id=agent.id, ticket_event_service=TicketEventService(db))
+    ticket_service = TicketService(
+        db,
+        agent_id=agent.id,
+        ticket_event_service=TicketEventService(db),
+        ticket_read_state_service=TicketReadStateService(db),
+    )
     update_data = {}
 
     if status_id and status_id.isdigit():
@@ -867,7 +885,11 @@ async def tickets_bulk_operation(
     """Массовые операции с тикетами."""
     import json
 
-    ticket_service = TicketService(db, ticket_event_service=TicketEventService(db))
+    ticket_service = TicketService(
+        db,
+        ticket_event_service=TicketEventService(db),
+        ticket_read_state_service=TicketReadStateService(db),
+    )
 
     try:
         ids = json.loads(ticket_ids)
@@ -1055,3 +1077,131 @@ def attachment_download(
         media_type=att.mime_type,
         headers={"Content-Disposition": disposition},
     )
+
+
+# === API endpoints ===
+
+@router.post("/tickets/{ticket_id}/mark-as-read")
+def mark_ticket_as_read(
+    ticket_id: int,
+    request: Request,
+    agent: AgentRead = Depends(check_can_view_tickets),
+    db: Session = Depends(get_db),
+):
+    """
+    Отметить сообщения в тикете как прочитанные.
+
+    Используется для сброса счётчика непрочитанных сообщений.
+    """
+    from app.services.ticket.read_state_service import TicketReadStateService
+
+    print(f"\n=== [DEBUG] mark-as-read: ticket_id={ticket_id}, agent_id={agent.id}, agent_login={agent.login}")
+
+    # Проверяем, что тикет существует (через TicketService без проверки прав)
+    from app.models.ticket import Ticket
+    ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
+    print(f"[DEBUG] ticket found: {ticket is not None}")
+    if ticket is None:
+        print(f"[DEBUG] ticket not found!")
+        raise HTTPException(status_code=404, detail="Тикет не найден")
+
+    # Проверяем, что агент имеет доступ к тикету (владелец или админ)
+    print(f"[DEBUG] ticket.owner_id={ticket.owner_id}, agent.id={agent.id}, agent.role={agent.role}")
+    if ticket.owner_id != agent.id and agent.role != "admin":
+        print(f"[DEBUG] access denied!")
+        raise HTTPException(status_code=403, detail="Нет доступа к тикету")
+
+    # Отмечаем как прочитанное
+    print(f"[DEBUG] calling mark_as_read...")
+    read_state_service = TicketReadStateService(db)
+    read_state_service.mark_as_read(ticket_id=ticket_id)
+    print(f"[DEBUG] mark_as_read done!")
+
+    # Если запрос пришёл с тестовой страницы, редиректим обратно
+    referer = request.headers.get("referer", "")
+    print(f"[DEBUG] referer={referer}")
+    if "/test/unread" in referer:
+        print(f"[DEBUG] redirecting to /test/unread")
+        return RedirectResponse(url="/test/unread", status_code=303)
+
+    print(f"[DEBUG] returning JSON")
+    return {"success": True, "ticket_id": ticket_id}
+
+
+@router.get("/tickets/{ticket_id}/unread-count")
+def get_ticket_unread_count(
+    ticket_id: int,
+    agent: AgentRead = Depends(check_can_view_tickets),
+    db: Session = Depends(get_db),
+):
+    """
+    Получить количество непрочитанных сообщений в тикете.
+    """
+    ticket_service = TicketService(db)
+
+    # Проверяем, что тикет существует
+    try:
+        ticket = ticket_service.get(ticket_id=ticket_id)
+    except NotFound:
+        raise HTTPException(status_code=404, detail="Тикет не найден")
+
+    # Проверяем, что агент имеет доступ к тикету (владелец или админ)
+    if ticket.owner_id != agent.id and agent.role != "admin":
+        raise HTTPException(status_code=403, detail="Нет доступа к тикету")
+
+    unread_count = ticket_service.get_unread_count(ticket_id=ticket_id)
+
+    return {"ticket_id": ticket_id, "unread_count": unread_count}
+
+
+@router.get("/tickets/unread/total")
+def get_total_unread_count(
+    agent: AgentRead = Depends(check_can_view_tickets),
+    db: Session = Depends(get_db),
+):
+    """
+    Получить общее количество непрочитанных сообщений по всем тикетам агента.
+
+    Возвращает сумму непрочитанных сообщений во всех тикетах, которые ведёт агент.
+    """
+    from app.services.ticket.read_state_service import TicketReadStateService
+
+    read_state_service = TicketReadStateService(db)
+
+    total_unread = read_state_service.get_total_unread_for_agent(
+        agent_id=agent.id,
+        exclude_internal=True,
+    )
+
+    return {
+        "agent_id": agent.id,
+        "total_unread": total_unread,
+    }
+
+
+@router.get("/tickets/unread/list")
+def get_tickets_with_unread(
+    agent: AgentRead = Depends(check_can_view_tickets),
+    db: Session = Depends(get_db),
+    min_unread: int = Query(1, ge=1, description="Минимальное кол-во непрочитанных"),
+):
+    """
+    Получить список тикетов агента с непрочитанными сообщениями.
+
+    Возвращает тикеты, отсортированные по количеству непрочитанных сообщений (убывание).
+    """
+    from app.services.ticket.read_state_service import TicketReadStateService
+
+    read_state_service = TicketReadStateService(db)
+
+    tickets_with_unread = read_state_service.get_tickets_with_unread(
+        agent_id=agent.id,
+        exclude_internal=True,
+        min_unread=min_unread,
+    )
+
+    return {
+        "agent_id": agent.id,
+        "count": len(tickets_with_unread),
+        "tickets": tickets_with_unread,
+    }

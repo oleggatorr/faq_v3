@@ -33,6 +33,8 @@ class AgentService:
             is_active=agent_data.is_active,
             phone=agent_data.phone,
             avatar_path=agent_data.avatar_path,
+            auto_assign=agent_data.auto_assign,
+            signature=agent_data.signature,
         )
         self.session.add(agent)
         if commit:
@@ -68,6 +70,7 @@ class AgentService:
             "last_login_at",
             "search",  # Специальный параметр для поиска по login + full_name
             "category_id",  # Фильтр по категории (вхождение в category_access)
+            "auto_assign",  # Фильтр по автоназначению
         }
         allowed_sort = {
             "id",
@@ -80,6 +83,7 @@ class AgentService:
             "last_login_at",
             "created_at",
             "updated_at",
+            "auto_assign",
         }
 
         if filters:

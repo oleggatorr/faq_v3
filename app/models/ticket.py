@@ -57,5 +57,6 @@ class Ticket(Base):
     
     messages = relationship("Message", back_populates="ticket", cascade="all, delete-orphan")
     events = relationship("TicketEvent", back_populates="ticket", cascade="all, delete-orphan")
-    
+    read_state = relationship("TicketReadState", back_populates="ticket", uselist=False, cascade="all, delete-orphan")
+
     merged_into = relationship("Ticket", remote_side=[id], backref="merged_tickets")

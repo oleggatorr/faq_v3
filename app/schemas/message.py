@@ -9,9 +9,7 @@ class MessageBase(BaseModel):
     ticket_id: int
     agent_id: int | None = None
     sender_name: str | None = None
-    customer_name: str | None = None
     customer_email: str | None = None
-    subject: str | None = None
     body: str
     is_internal: bool = False
     is_automatic: bool = False
@@ -21,12 +19,10 @@ class MessageBase(BaseModel):
 class MessageCreate(BaseModel):
     ticket_id: int
     body: str
-    subject: str | None = None
-    
+
     # Делаем поля опциональными, так как сервис подставит их сам
-    customer_name: str | None = None 
     customer_email: str | None = None
-    
+
     is_internal: bool = False
     is_automatic: bool = False
     ip_address: str | None = None
@@ -34,9 +30,7 @@ class MessageCreate(BaseModel):
 
 class MessageUpdate(BaseModel):
     agent_id: int | None = None
-    customer_name: str | None = None
     customer_email: str | None = None
-    subject: str | None = None
     body: str | None = None
     is_internal: bool | None = None
     is_automatic: bool | None = None

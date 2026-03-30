@@ -12,12 +12,10 @@ class Message(Base):
 
     # ФИО отправителя (заполняется при создании)
     # - Если от агента → agent.full_name
-    # - Если от клиента → customer_name
+    # - Если от клиента → ticket.customer_name
     sender_name = Column(String(200), nullable=True)
 
-    customer_name = Column(String(200), nullable=True)
     customer_email = Column(String(255), nullable=True)
-    subject = Column(String(255), nullable=True)
     body = Column(Text, nullable=False)
 
     is_internal = Column(Boolean, default=False, nullable=False, index=True)

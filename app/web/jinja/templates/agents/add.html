@@ -131,6 +131,41 @@
             </div>
           </div>
 
+          <!-- Статус и автоназначение -->
+          <div class="row g-3 mb-4">
+            <div class="col-md-6">
+              <div class="form-check form-switch">
+                <input
+                  class="form-check-input"
+                  type="checkbox"
+                  name="is_active"
+                  id="is_active"
+                  checked
+                />
+                <label class="form-check-label" for="is_active">
+                  <strong>Активен</strong>
+                </label>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="form-check form-switch">
+                <input
+                  class="form-check-input"
+                  type="checkbox"
+                  name="auto_assign"
+                  id="auto_assign"
+                  checked
+                />
+                <label class="form-check-label" for="auto_assign">
+                  <strong>📬 Автоприсылание сообщений</strong>
+                </label>
+                <small class="form-text text-muted d-block">
+                  Автоматически назначать новые тикеты на этого оператора
+                </small>
+              </div>
+            </div>
+          </div>
+
           <!-- Категории вопросов -->
           <div id="category_block" class="mb-4">
             <h5 class="mb-3">📁 Доступ к категориям вопросов</h5>

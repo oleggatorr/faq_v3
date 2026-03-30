@@ -16,6 +16,7 @@ from app.schemas.ticket import TicketCreate, TicketRead, TicketUpdate
 from app.services.errors import Conflict, NotFound, ValidationFailed
 from app.services.ticket.ticket_event_service import TicketEventService
 from app.services.ticket.ticket_base_service import TicketBaseService
+from app.services.ticket.read_state_service import TicketReadStateService
 from app.services.utils import apply_filters, apply_sort, format_preview
 from app.core.permissions import Permission
 
@@ -34,10 +35,12 @@ class TicketService(TicketBaseService):
         session: Session,
         *,
         ticket_event_service: TicketEventService | None = None,
+        ticket_read_state_service: TicketReadStateService | None = None,
         agent_id: int | None = None,
     ):
         super().__init__(session, agent_id=agent_id)
         self.ticket_event_service = ticket_event_service
+        self.ticket_read_state_service = ticket_read_state_service
 
     def _get_by_track_id(self, track_id: str) -> Optional[Ticket]:
         return (
@@ -170,6 +173,8 @@ class TicketService(TicketBaseService):
         sort_desc: bool = False,
         limit: int = 100,
         offset: int = 0,
+        include_unread: bool = False,
+        agent_id: int | None = None,
     ) -> list[TicketRead]:
         # Проверка права выполняется на уровне роута (check_can_view_*)
         # Здесь просто фильтрация и выборка
@@ -226,6 +231,21 @@ class TicketService(TicketBaseService):
             allowed_sort_fields=allowed_sort,
         )
         tickets = query.offset(offset).limit(limit).all()
+        
+        # Если нужно включить unread_count, получаем его для каждого тикета
+        ticket_read_list = []
+        if include_unread and agent_id is not None:
+            for ticket in tickets:
+                ticket_dict = ticket.__dict__.copy()
+                if '_sa_instance_state' in ticket_dict:
+                    del ticket_dict['_sa_instance_state']
+                
+                # Считаем непрочитанные сообщения
+                unread_count = self.get_unread_count(ticket_id=ticket.id)
+                ticket_read = TicketRead(**ticket_dict, unread_count=unread_count)
+                ticket_read_list.append(ticket_read)
+            return ticket_read_list
+        
         return [TicketRead.model_validate(t) for t in tickets]
 
     def create_ticket(
@@ -491,6 +511,27 @@ class TicketService(TicketBaseService):
 
         return DeleteResponse(success=True, deleted_id=ticket_id)
 
+    def get_unread_count(self, *, ticket_id: int, exclude_internal: bool = True) -> int:
+        """
+        Получить количество непрочитанных сообщений в тикете.
+        """
+        if self.ticket_read_state_service is None:
+            self.ticket_read_state_service = TicketReadStateService(self.session)
+        
+        return self.ticket_read_state_service.get_unread_count(
+            ticket_id=ticket_id,
+            exclude_internal=exclude_internal,
+        )
+
+    def mark_as_read(self, *, ticket_id: int) -> None:
+        """
+        Отметить все сообщения в тикете как прочитанные.
+        """
+        if self.ticket_read_state_service is None:
+            self.ticket_read_state_service = TicketReadStateService(self.session)
+        
+        self.ticket_read_state_service.mark_as_read(ticket_id=ticket_id)
+
     def change_status(
         self,
         *,
@@ -598,6 +639,10 @@ class TicketService(TicketBaseService):
 
         ticket.owner_id = new_owner_id
 
+        # Сбросить состояние прочтения при смене владельца
+        if self.ticket_read_state_service is not None:
+            self.ticket_read_state_service.reset_on_reassign(ticket_id=ticket_id)
+
         if self.ticket_event_service is not None:
             action_type = EventType.assigned if new_owner_id is not None else EventType.unassigned
             self.ticket_event_service.add_event(
@@ -657,6 +702,7 @@ class TicketService(TicketBaseService):
         agent_id: int | None,
         commit: bool = True,
     ) -> Ticket:
+        #///В разработке
         if source_ticket_id == target_ticket_id:
             raise Conflict("Cannot merge a ticket into itself")
 

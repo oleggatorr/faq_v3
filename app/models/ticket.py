@@ -41,6 +41,7 @@ class Ticket(Base):
     
     is_archived = Column(Boolean, default=False, nullable=False, index=True)
     is_locked = Column(Boolean, default=False, nullable=False)
+    is_anonymized = Column(Boolean, default=False, nullable=False)
     merged_into_id = Column(Integer, ForeignKey("tickets.id", ondelete="SET NULL", onupdate="CASCADE"), nullable=True, index=True)
     
     messages_count = Column(Integer, default=0, nullable=False)
@@ -60,3 +61,7 @@ class Ticket(Base):
     read_state = relationship("TicketReadState", back_populates="ticket", uselist=False, cascade="all, delete-orphan")
 
     merged_into = relationship("Ticket", remote_side=[id], backref="merged_tickets")
+    
+    def is_anonymized_check(self) -> bool:
+        """Проверить, анонимизирован ли тикет."""
+        return bool(self.is_anonymized)

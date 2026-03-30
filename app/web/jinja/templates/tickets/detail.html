@@ -46,6 +46,15 @@
         {% endif %}
       {% else %}
         <div class="btn-group" role="group">
+          <!-- Анонимизация -->
+          {% if can_edit_tickets %}
+          <button type="button" class="btn btn-sm btn-outline-secondary"
+                  data-bs-toggle="modal" data-bs-target="#anonymizeModal"
+                  title="Анонимизировать тикет">
+            🔒 Анонимизировать
+          </button>
+          {% endif %}
+
           {% if can_del_tickets %}
           <form method="post" action="/tickets/{{ ticket.id }}/delete" class="d-inline"
                 onsubmit="return confirm('⚠️ Вы уверены, что хотите отправить тикет в архив?');">
@@ -54,7 +63,7 @@
             </button>
           </form>
           {% endif %}
-          
+
           {% if can_hard_del_tickets %}
           <button type="button" class="btn btn-sm btn-outline-danger"
                   data-bs-toggle="modal" data-bs-target="#hardDeleteModal">
@@ -64,6 +73,51 @@
         </div>
       {% endif %}
     </div>
+
+    <!-- Модальное окно анонимизации -->
+    {% if can_edit_tickets %}
+    <div class="modal fade" id="anonymizeModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header bg-warning text-dark">
+            <h1 class="modal-title fs-5">
+              🔒 Анонимизация тикета
+            </h1>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <p class="mb-2">
+              Вы действительно хотите анонимизировать тикет:
+            </p>
+            <div class="alert alert-warning mb-0">
+              <strong>{{ ticket.track_id }}</strong><br>
+              <small>Тема: {{ ticket.subject }}</small>
+            </div>
+            <div class="alert alert-danger mt-3 mb-0">
+              <strong>⚠️ Внимание:</strong> Это действие скроет персональные данные:
+              <ul class="mb-0 mt-2">
+                <li>Имя клиента будет удалено</li>
+                <li>Email будет удалён</li>
+                <li>Все сообщения от клиента будут анонимизированы</li>
+                <li>Будущие сообщения не будут содержать имён</li>
+              </ul>
+              <p class="mt-2 mb-0"><small>IP-адреса и история изменений сохранятся для аудита.</small></p>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+              ❌ Отмена
+            </button>
+            <form method="post" action="/tickets/{{ ticket.id }}/anonymize" class="d-inline">
+              <button type="submit" class="btn btn-warning">
+                🔒 Анонимизировать
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
     
     <!-- Модальное окно полного удаления -->
     {% if can_hard_del_tickets %}
@@ -384,9 +438,19 @@
                   <span class="badge bg-success">👤 {{ msg.sender_name|default('Клиент', true) }}</span>
                 {% endif %}
               </div>
-              <small class="text-muted">
-                {{ msg.created_at.strftime('%d.%m.%Y %H:%M') }}
-              </small>
+              <div class="d-flex align-items-center gap-2">
+                <small class="text-muted">
+                  {{ msg.created_at.strftime('%d.%m.%Y %H:%M') }}
+                </small>
+                {% if can_edit_tickets and not msg.is_internal and msg.customer_email %}
+                  <form method="POST" action="/messages/{{ msg.id }}/anonymize" class="d-inline"
+                        onsubmit="return confirm('⚠️ Вы уверены, что хотите анонимизировать сообщение?\n\nБудут удалены:\n- Имя отправителя\n- Email\n\nIP-адрес будет сохранён для аудита.');">
+                    <button type="submit" class="btn btn-sm btn-outline-secondary" title="Анонимизировать">
+                      🔒
+                    </button>
+                  </form>
+                {% endif %}
+              </div>
             </div>
             <div class="message-body">
               {{ msg.body|nl2br }}

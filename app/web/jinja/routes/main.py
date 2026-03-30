@@ -3,8 +3,11 @@ from pathlib import Path
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from sqlalchemy.orm import Session
 
 from app.core.auth import CurrentAgent, CurrentAgentOptional
+from app.models import get_db
+from app.services.ticket.read_state_service import TicketReadStateService
 
 templates_dir = Path(__file__).resolve().parent.parent / "templates"
 templates = Jinja2Templates(directory=str(templates_dir))
@@ -18,6 +21,26 @@ def _nl2br_filter(value: str) -> str:
 
 
 templates.env.filters["nl2br"] = _nl2br_filter
+
+
+def _get_unread_count(request: Request) -> int:
+    """Получить количество непрочитанных сообщений для текущего агента."""
+    agent = getattr(request.state, 'agent', None)
+    if not agent:
+        return 0
+    
+    db = next(get_db())
+    try:
+        read_state_service = TicketReadStateService(db)
+        return read_state_service.get_total_unread_for_agent(agent_id=agent.id)
+    except Exception:
+        return 0
+    finally:
+        db.close()
+
+
+# Добавляем глобальную функцию для получения количества непрочитанных
+templates.env.globals["get_unread_count"] = _get_unread_count
 
 
 router = APIRouter(prefix="", tags=["jinja"])

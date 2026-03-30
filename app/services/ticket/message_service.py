@@ -231,7 +231,24 @@ class MessageService:
             allowed_sort_fields=allowed_sort,
         )
         msgs = query.offset(offset).limit(limit).all()
-        return [MessageRead.model_validate(m) for m in msgs]
+        
+        # Обрабатываем анонимизированные сообщения
+        result = []
+        for msg in msgs:
+            # Проверяем, анонимизирован ли тикет
+            ticket = msg.ticket
+            if ticket and ticket.is_anonymized and msg.agent_id is None:
+                # Заменяем данные на "Аноним" для сообщений от клиента
+                msg_dict = msg.__dict__.copy()
+                if '_sa_instance_state' in msg_dict:
+                    del msg_dict['_sa_instance_state']
+                msg_dict['sender_name'] = "Аноним"
+                msg_dict['customer_email'] = "Аноним"
+                result.append(MessageRead(**msg_dict))
+            else:
+                result.append(MessageRead.model_validate(msg))
+        
+        return result
 
     def update(
         self,
@@ -311,4 +328,59 @@ class MessageService:
             self.session.flush()
 
         return DeleteResponse(success=True, deleted_id=message_id)
+
+    def anonymize_message(
+        self,
+        *,
+        message_id: int,
+        agent_id: int | None,
+        commit: bool = True,
+    ) -> Message:
+        """
+        Анонимизировать сообщение.
+        
+        Удаляет персональные данные:
+        - sender_name → "" (пустая строка)
+        - customer_email → "" (пустая строка)
+        
+        IP-адрес сохраняется (требуется для аудита).
+        
+        Args:
+            message_id: ID сообщения
+            agent_id: ID агента, выполнившего анонимизацию
+            commit: Закоммитить изменения
+        
+        Returns:
+            Обновлённое сообщение
+        """
+        msg = self.session.query(Message).filter(Message.id == message_id).one_or_none()
+        if msg is None:
+            raise NotFound("Message not found")
+        
+        # Сохраняем старые значения для аудита
+        old_sender_name = msg.sender_name
+        old_customer_email = msg.customer_email
+        
+        # Анонимизируем - заменяем на ПУСТЫЕ строки
+        msg.sender_name = ""
+        msg.customer_email = ""
+        
+        # Логируем анонимизацию
+        if self.ticket_event_service is not None:
+            self.ticket_event_service.add_event(
+                ticket_id=msg.ticket_id,
+                agent_id=agent_id,
+                action_type=EventType.note_added,  # Используем note_added как ближайшее событие
+                field_name="anonymization",
+                old_value=f"sender={old_sender_name}, email={old_customer_email}",
+                new_value="sender='', email=''",
+                comment=f"message_anonymized message_id={msg.id}",
+            )
+        
+        if commit:
+            self.session.commit()
+        else:
+            self.session.flush()
+        
+        return msg
 

@@ -152,6 +152,12 @@
           Выделено тикетов: <strong id="selected-count">0</strong>
         </span>
         <div class="btn-group" role="group">
+          <button type="button" class="btn btn-sm btn-outline-success" onclick="applyToSelected('mark_read')" title="Отметить прочитанными">
+            ✅ Прочитано
+          </button>
+          <button type="button" class="btn btn-sm btn-outline-secondary" onclick="applyToSelected('anonymize')" title="Анонимизировать сообщения">
+            🔒 Анонимизировать
+          </button>
           <button type="button" class="btn btn-sm btn-outline-primary" onclick="applyToSelected('archive')" title="В архив">
             🗑️ В архив
           </button>
@@ -225,37 +231,49 @@
             <th style="width: 40px;">
               <input type="checkbox" class="form-check-input" id="select-all" onchange="toggleSelectAll(this)">
             </th>
-            <th>ID / Трек</th>
-            <th style="width: 150px;">Дата создания</th>
+            <th style="width: 100px;">Трек</th>
             <th>Категория</th>
+            <th>Заголовок</th>
             <th style="width: 120px;">Статус</th>
-            <th>Тема</th>
+            <th style="width: 140px;">Дата</th>
+            <th style="width: 80px; text-align: center;">📬</th>
           </tr>
         </thead>
         <tbody>
           {% for t in tickets %}
-            <tr>
+            <tr class="{% if t.unread_count and t.unread_count > 0 %}table-active{% endif %}">
               <td>
                 <input type="checkbox" class="form-check-input ticket-checkbox" value="{{ t.id }}" onchange="updateSelectedCount()">
               </td>
               <td>
-                <a href="/tickets/{{ t.id }}" class="fw-bold">
-                  #{{ t.id }} / {{ t.track_id }}
+                <a href="/tickets/{{ t.id }}" class="fw-bold text-nowrap">
+                  {{ t.track_id }}
                 </a>
               </td>
-              <td class="text-muted">
-                {{ t.created_at.strftime('%d.%m.%Y %H:%M') if t.created_at else '—' }}
+              <td>
+                <span class="badge bg-secondary">
+                  {{ category_name_by_id.get(t.category_id, t.category_id or '—') }}
+                </span>
               </td>
               <td>
-                {{ category_name_by_id.get(t.category_id, t.category_id or '—') }}
+                <a href="/tickets/{{ t.id }}" class="text-decoration-none">
+                  {{ t.subject }}
+                </a>
               </td>
               <td>
                 <span class="badge bg-{% if status_name_by_id.get(t.status_id, '') == 'Новый' %}info{% elif status_name_by_id.get(t.status_id, '') == 'В работе' %}warning{% elif status_name_by_id.get(t.status_id, '') == 'Закрыт' %}success{% else %}secondary{% endif %}">
                   {{ status_name_by_id.get(t.status_id, t.status_id or '—') }}
                 </span>
               </td>
-              <td>
-                {{ t.subject }}
+              <td class="text-muted small">
+                {{ t.created_at.strftime('%d.%m.%Y %H:%M') if t.created_at else '—' }}
+              </td>
+              <td class="text-center">
+                {% if t.unread_count and t.unread_count > 0 %}
+                  <span class="badge bg-danger rounded-pill">{{ t.unread_count }}</span>
+                {% else %}
+                  <span class="text-muted">—</span>
+                {% endif %}
               </td>
             </tr>
           {% endfor %}

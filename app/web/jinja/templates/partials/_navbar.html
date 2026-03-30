@@ -17,14 +17,24 @@
               🏠 Домой
             </a>
           </li>
+          {% if agent.has_permission('can_view_own_tickets') or agent.role == 'admin' %}
+            <li class="nav-item position-relative">
+              <a class="nav-link" href="/tickets/my">
+                📋 Мои тикеты
+              </a>
+              {% set unread = get_unread_count(request) %}
+              {% if unread and unread > 0 %}
+                <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size: 0.7rem;">
+                  {{ unread }}
+                </span>
+              {% endif %}
+            </li>
+          {% endif %}
           <li class="nav-item dropdown">
             <a class="nav-link dropdown-toggle" href="#" id="ticketsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-              📋 Тикеты
+              🗂️ Все тикеты
             </a>
             <ul class="dropdown-menu" aria-labelledby="ticketsDropdown">
-              {% if agent.has_permission('can_view_own_tickets') or agent.role == 'admin' %}
-                <li><a class="dropdown-item" href="/tickets">📋 Мои тикеты</a></li>
-              {% endif %}
               {% if agent.has_permission('can_view_all_tickets') or agent.role == 'admin' %}
                 <li><a class="dropdown-item" href="/tickets/all">📂 Все тикеты</a></li>
               {% endif %}

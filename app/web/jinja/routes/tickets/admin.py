@@ -332,7 +332,7 @@ def tickets_my(
     # Обработка пустых значений
     limit_int = int(limit) if limit and limit.strip() else 10
     offset_int = int(offset) if offset and offset.strip() else 0
-    
+
     # Передаём agent_id для проверок прав в сервисе
     ticket_service = TicketService(db, agent_id=agent.id)
     category_service = QuestionCategoryService(db)
@@ -341,6 +341,60 @@ def tickets_my(
 
     # Фильтр: только тикеты, назначенные текущему агенту
     filters = {"owner_id": agent.id}
+
+    # Преобразуем пустые строки в None
+    status_id_int = int(status_id) if status_id and status_id.strip() else None
+    category_id_int = int(category_id) if category_id and category_id.strip() else None
+
+    if status_id_int:
+        filters["status_id"] = status_id_int
+    if category_id_int:
+        filters["category_id"] = category_id_int
+
+    # Фильтр по архиву
+    if archived == "active":
+        filters["is_archived"] = False
+    elif archived == "archived":
+        filters["is_archived"] = True
+
+    # Получаем тикеты с unread_count
+    tickets = ticket_service.list(
+        filters=filters if filters else None,
+        sort_by=sort_by,
+        sort_desc=sort_desc,
+        limit=limit_int,
+        offset=offset_int,
+        include_unread=True,
+        agent_id=agent.id,
+    )
+    categories = category_service.list(limit=500)
+    statuses = status_service.list(limit=200)
+    agents = agent_service.list(filters={"is_active": True}, sort_by="full_name", limit=500)
+
+    # Словари для быстрого поиска имён
+    category_name_by_id = {c.id: c.name for c in categories}
+    status_name_by_id = {s.id: s.name for s in statuses}
+
+    return templates.TemplateResponse(
+        "tickets/my.html",
+        {
+            "request": request,
+            "agent": agent,
+            "tickets": tickets,
+            "categories": categories,
+            "statuses": statuses,
+            "agents": agents,
+            "category_name_by_id": category_name_by_id,
+            "status_name_by_id": status_name_by_id,
+            "status_id": status_id,
+            "category_id": category_id,
+            "sort_by": sort_by,
+            "sort_desc": sort_desc,
+            "limit": limit,
+            "offset": offset,
+            "archived": archived,
+        },
+    )
 
 
 @router.get("/tickets/all", response_class=HTMLResponse)
@@ -875,21 +929,22 @@ def restore_ticket(
 @router.post("/tickets/bulk-operation", response_class=RedirectResponse)
 async def tickets_bulk_operation(
     request: Request,
-    agent: AgentRead = Depends(check_can_edit_tickets),
     db: Session = Depends(get_db),
     ticket_ids: str = Form(...),  # JSON array of ticket IDs
-    operation: str = Form(...),  # archive, delete, assign, change_status
+    operation: str = Form(...),  # archive, delete, assign, change_status, mark_read
     owner_id: int | None = Form(None),
     status_id: int | None = Form(None),
 ):
     """Массовые операции с тикетами."""
     import json
 
-    ticket_service = TicketService(
-        db,
-        ticket_event_service=TicketEventService(db),
-        ticket_read_state_service=TicketReadStateService(db),
-    )
+    # Проверка прав в зависимости от операции
+    if operation == 'mark_read':
+        # Для отметки прочитанным достаточно права просмотра своих тикетов
+        agent = check_can_view_own_tickets(request, db)
+    else:
+        # Для остальных операций нужно право на редактирование
+        agent = check_can_edit_tickets(request, db)
 
     try:
         ids = json.loads(ticket_ids)
@@ -898,6 +953,14 @@ async def tickets_bulk_operation(
     except (json.JSONDecodeError, ValueError):
         request.session["flash_error"] = "Неверный формат данных"
         return RedirectResponse(url="/tickets", status_code=303)
+
+    # Создаём сервисы после получения agent
+    ticket_service = TicketService(
+        db,
+        agent_id=agent.id,
+        ticket_event_service=TicketEventService(db),
+        ticket_read_state_service=TicketReadStateService(db),
+    )
 
     success_count = 0
     error_count = 0
@@ -939,7 +1002,7 @@ async def tickets_bulk_operation(
                     agent_id=agent.id,
                 )
                 success_count += 1
-                
+
                 # Логируем разархивирование
                 client_info = get_client_info(request)
                 log_service = AuditLogService(db)
@@ -951,6 +1014,34 @@ async def tickets_bulk_operation(
                     details={"bulk_operation": "unarchive", "track_id": ticket.track_id},
                     **client_info,
                 )
+
+            elif operation == 'mark_read':
+                # Отметить тикет как прочитанный
+                ticket_service.mark_as_read(ticket_id=ticket_id)
+                success_count += 1
+
+                # Логируем отметку о прочтении
+                client_info = get_client_info(request)
+                log_service = AuditLogService(db)
+                log_service.log_action(
+                    action="update",
+                    entity_type="ticket",
+                    entity_id=ticket_id,
+                    agent_id=agent.id,
+                    details={"bulk_operation": "mark_read", "track_id": ticket.track_id},
+                    **client_info,
+                )
+
+            elif operation == 'anonymize':
+                # Анонимизировать тикет (установить флаг is_anonymized)
+                from app.models.ticket import Ticket
+                
+                ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
+                if ticket:
+                    ticket.is_anonymized = True
+                    success_count += 1
+                
+                db.commit()
 
             elif operation == 'delete':
                 if agent.has_permission('can_hard_del_tickets') or agent.role == 'admin':
@@ -1042,26 +1133,81 @@ async def tickets_bulk_operation(
     if error_count > 0:
         request.session["flash_error"] = f"Ошибок: {error_count}"
 
-    return RedirectResponse(url="/tickets", status_code=303)
+    # Возвращаем на ту же страницу, где был пользователь
+    if operation == 'mark_read':
+        # Для отметки прочитанными возвращаем на /tickets/my
+        return RedirectResponse(url="/tickets/my", status_code=303)
+    else:
+        # Для остальных операций возвращаем на /tickets
+        return RedirectResponse(url="/tickets", status_code=303)
 
 
-@router.get("/attachments/{attachment_id}/download")
+@router.get("/attachments/{attachment_id}/download", response_class=HTMLResponse)
 def attachment_download(
     attachment_id: int,
+    request: Request,
     agent: CurrentAgent,
     db: Session = Depends(get_db),
 ):
     """Скачать вложение (для авторизованных операторов)."""
+    from app.services.ticket.attachment_service import AttachmentService
+    from app.services.file_storage_service import FileStorageService
+    
     attachment_service = AttachmentService(db)
     att = attachment_service.get_orm(attachment_id=attachment_id)
+    
+    print(f"[DEBUG] Download attachment {attachment_id}")
+    print(f"[DEBUG] Attachment: {att}")
+    
     if att is None:
-        raise HTTPException(status_code=404, detail="Вложение не найдено")
+        # Вложение не найдено в БД
+        print(f"[DEBUG] Attachment not found in DB")
+        return templates.TemplateResponse(
+            "error/file_not_found.html",
+            {
+                "request": request,
+                "agent": agent,
+                "attachment_id": attachment_id,
+                "error_message": "Вложение не найдено в базе данных",
+            },
+            status_code=404,
+        )
 
     file_storage = FileStorageService()
     path = file_storage.get_path(att.file_path)
+    
+    print(f"[DEBUG] File path: {path}")
+    print(f"[DEBUG] File exists: {path.exists()}")
+    print(f"[DEBUG] File is_file: {path.is_file()}")
+    
+    # Проверяем существование файла ПЕРЕД тем как возвращать FileResponse
+    if not path.exists():
+        print(f"[DEBUG] File does not exist, returning HTML error")
+        return templates.TemplateResponse(
+            "error/file_not_found.html",
+            {
+                "request": request,
+                "agent": agent,
+                "attachment_id": attachment_id,
+                "error_message": "Файл не найден на диске",
+            },
+            status_code=404,
+        )
+    
     if not path.is_file():
-        raise HTTPException(status_code=404, detail="Файл не найден")
+        print(f"[DEBUG] Path is not a file, returning HTML error")
+        return templates.TemplateResponse(
+            "error/file_not_found.html",
+            {
+                "request": request,
+                "agent": agent,
+                "attachment_id": attachment_id,
+                "error_message": "Указанный путь не является файлом",
+            },
+            status_code=404,
+        )
 
+    print(f"[DEBUG] File exists, returning FileResponse")
     attachment_service.increment_download_count(attachment_id=attachment_id)
 
     # Определяем, как открывать файл
@@ -1126,6 +1272,77 @@ def mark_ticket_as_read(
 
     print(f"[DEBUG] returning JSON")
     return {"success": True, "ticket_id": ticket_id}
+
+
+@router.post("/messages/{message_id}/anonymize", response_class=RedirectResponse)
+def anonymize_message(
+    message_id: int,
+    request: Request,
+    agent: AgentRead = Depends(check_can_edit_tickets),
+    db: Session = Depends(get_db),
+):
+    """
+    Анонимизировать сообщение.
+    
+    Удаляет персональные данные (имя, email), сохраняя IP для аудита.
+    """
+    from app.services.ticket.message_service import MessageService
+    from app.models.message import Message
+    
+    message_service = MessageService(db, ticket_event_service=TicketEventService(db))
+    
+    try:
+        # Анонимизируем сообщение
+        message_service.anonymize_message(
+            message_id=message_id,
+            agent_id=agent.id,
+        )
+        
+        request.session["flash_success"] = "Сообщение анонимизировано"
+    except Exception as e:
+        request.session["flash_error"] = f"Ошибка: {str(e)}"
+    
+    # Возвращаем на страницу тикета
+    # Сначала получаем ticket_id из сообщения
+    msg = db.query(Message).filter(Message.id == message_id).first()
+    if msg:
+        return RedirectResponse(url=f"/tickets/{msg.ticket_id}", status_code=303)
+    else:
+        return RedirectResponse(url="/tickets", status_code=303)
+
+
+@router.post("/tickets/{ticket_id}/anonymize", response_class=RedirectResponse)
+def anonymize_ticket(
+    ticket_id: int,
+    request: Request,
+    agent: AgentRead = Depends(check_can_edit_tickets),
+    db: Session = Depends(get_db),
+):
+    """
+    Анонимизировать тикет.
+    
+    Устанавливает флаг is_anonymized.
+    При чтении данные будут заменяться на "Аноним".
+    """
+    from app.models.ticket import Ticket
+    
+    ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
+    if ticket is None:
+        request.session["flash_error"] = "Тикет не найден"
+        return RedirectResponse(url="/tickets", status_code=303)
+    
+    try:
+        # Устанавливаем флаг анонимизации
+        ticket.is_anonymized = True
+        db.commit()
+        
+        request.session["flash_success"] = f"Тикет {ticket.track_id} анонимизирован"
+        
+    except Exception as e:
+        db.rollback()
+        request.session["flash_error"] = f"Ошибка: {str(e)}"
+    
+    return RedirectResponse(url=f"/tickets/{ticket_id}", status_code=303)
 
 
 @router.get("/tickets/{ticket_id}/unread-count")

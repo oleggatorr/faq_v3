@@ -44,6 +44,8 @@ class AgentEditService(AgentBaseService):
             "permissions": lambda v: v,
             "is_active": lambda v: v,
             "role": lambda v: v,
+            "auto_assign": lambda v: v,
+            "email_notifications": lambda v: v,
         }
         
         # Добавляем login если есть

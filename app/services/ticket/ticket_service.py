@@ -127,7 +127,59 @@ class TicketService(TicketBaseService):
         )
         self.session.add(message)
 
-        # 3) optionally create audit event
+        # 3) Автоназначение оператора, если owner_id не указан
+        print(f"\n{'='*60}")
+        print(f"[AUTO-ASSIGN] Starting auto-assignment for ticket #{ticket.id}")
+        print(f"[AUTO-ASSIGN] owner_id={ticket_data.owner_id}, category_id={ticket.category_id}, department_id={ticket.department_id}")
+        
+        if ticket_data.owner_id is None and ticket.category_id is not None:
+            try:
+                from app.services.ticket.assignment_service import AssignmentService
+                assignment_service = AssignmentService(self.session)
+                
+                print(f"[AUTO-ASSIGN] Calling get_available_operators...")
+                print(f"[AUTO-ASSIGN]   category_id={ticket.category_id}")
+                print(f"[AUTO-ASSIGN]   department_id=None (ищем по всем операторам)")
+                print(f"[AUTO-ASSIGN]   only_auto_assign=True")
+                print(f"[AUTO-ASSIGN]   include_inactive=False")
+                print(f"[AUTO-ASSIGN]   random=True")
+                
+                # Получаем случайного подходящего оператора
+                # department_id=None — ищем по ВСЕМ операторам с доступом к категории
+                operators = assignment_service.get_available_operators(
+                    category_id=ticket.category_id,
+                    department_id=None,  # ← НЕ фильтруем по департаменту!
+                    only_auto_assign=True,
+                    include_inactive=False,
+                    random=True,  # Случайный выбор
+                )
+                
+                print(f"[AUTO-ASSIGN] Found {len(operators)} suitable operators")
+                for i, op in enumerate(operators):
+                    print(f"[AUTO-ASSIGN]   [{i+1}] {op.agent.full_name} (login={op.agent.login}, auto_assign={op.agent.auto_assign}, score={op.score})")
+                
+                # Назначаем первого подходящего оператора
+                if operators and len(operators) > 0:
+                    selected_operator = operators[0]
+                    ticket.owner_id = selected_operator.agent.id
+                    print(f"[AUTO-ASSIGN] ✅ Ticket #{ticket.id} assigned to {selected_operator.agent.full_name} (ID={selected_operator.agent.id})")
+                    print(f"[AUTO-ASSIGN]   Category: {ticket.category_id}")
+                    print(f"[AUTO-ASSIGN]   Department: {ticket.department_id}")
+                else:
+                    print(f"[AUTO-ASSIGN] ❌ No suitable operators found for category {ticket.category_id}")
+            except Exception as e:
+                print(f"[AUTO-ASSIGN] ❌ Error: {e}")
+                import traceback
+                traceback.print_exc()
+        else:
+            if ticket_data.owner_id is not None:
+                print(f"[AUTO-ASSIGN] Skipped: owner_id already set to {ticket_data.owner_id}")
+            if ticket.category_id is None:
+                print(f"[AUTO-ASSIGN] Skipped: category_id is None")
+        
+        print(f"{'='*60}\n")
+
+        # 4) optionally create audit event
         if self.ticket_event_service is not None:
             self.ticket_event_service.add_event(
                 ticket_id=ticket.id,
@@ -157,10 +209,16 @@ class TicketService(TicketBaseService):
     def get(self, *, ticket_id: int) -> TicketRead:
         # Проверка права на просмотр тикетов
         self._check_permission(Permission.can_view_tickets)
-        
+
         ticket = self.session.query(Ticket).filter(Ticket.id == ticket_id).one_or_none()
         if ticket is None:
             raise NotFound("Ticket not found")
+        
+        # Если тикет анонимизирован, заменяем данные на "Аноним"
+        if ticket.is_anonymized:
+            ticket.customer_name = "Аноним"
+            ticket.customer_email = "Аноним"
+        
         return TicketRead.model_validate(ticket)
 
     def list(
@@ -237,14 +295,32 @@ class TicketService(TicketBaseService):
                 ticket_dict = ticket.__dict__.copy()
                 if '_sa_instance_state' in ticket_dict:
                     del ticket_dict['_sa_instance_state']
-                
+
+                # Если тикет анонимизирован, заменяем данные на "Аноним"
+                if ticket.is_anonymized:
+                    ticket_dict['customer_name'] = "Аноним"
+                    ticket_dict['customer_email'] = "Аноним"
+
                 # Считаем непрочитанные сообщения
                 unread_count = self.get_unread_count(ticket_id=ticket.id)
                 ticket_read = TicketRead(**ticket_dict, unread_count=unread_count)
                 ticket_read_list.append(ticket_read)
             return ticket_read_list
+
+        # Обрабатываем анонимизированные тикеты
+        result = []
+        for ticket in tickets:
+            if ticket.is_anonymized:
+                ticket_dict = ticket.__dict__.copy()
+                if '_sa_instance_state' in ticket_dict:
+                    del ticket_dict['_sa_instance_state']
+                ticket_dict['customer_name'] = "Аноним"
+                ticket_dict['customer_email'] = "Аноним"
+                result.append(TicketRead(**ticket_dict))
+            else:
+                result.append(TicketRead.model_validate(ticket))
         
-        return [TicketRead.model_validate(t) for t in tickets]
+        return result
 
     def create_ticket(
         self,

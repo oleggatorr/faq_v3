@@ -26,6 +26,7 @@ class TicketBase(BaseModel):
     closed_by_id: int | None = None
     is_archived: bool = False
     is_locked: bool = False
+    is_anonymized: bool = False
     merged_into_id: int | None = None
     messages_count: int = 0
     attachments_count: int = 0

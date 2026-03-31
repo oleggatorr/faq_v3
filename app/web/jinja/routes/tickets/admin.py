@@ -43,6 +43,7 @@ from app.services.ticket import (
     AttachmentService,
     TicketReadStateService,
 )
+from app.services.ban_service import BanService
 
 from ..main import templates
 from ..utils import _ticket_filters
@@ -375,8 +376,15 @@ def tickets_my(
     category_name_by_id = {c.id: c.name for c in categories}
     status_name_by_id = {s.id: s.name for s in statuses}
 
+    # Получаем общее количество для пагинации
+    all_tickets = ticket_service.list(
+        filters=filters if filters else None,
+        limit=999999,
+    )
+    total_count = len(all_tickets)
+
     return templates.TemplateResponse(
-        "tickets/my.html",
+        "operator/tickets/my.html",
         {
             "request": request,
             "agent": agent,
@@ -393,6 +401,9 @@ def tickets_my(
             "limit": limit,
             "offset": offset,
             "archived": archived,
+            "total_count": total_count,
+            "limit_int": limit_int,
+            "offset_int": offset_int,
         },
     )
 
@@ -410,12 +421,14 @@ def tickets_all(
     limit: str | None = Query(None),
     offset: str | None = Query(None),
     archived: str = Query("active", description="Filter by archived: active, archived, all"),
+    owner_filter: str = Query("unassigned", description="Filter by owner: unassigned, assigned, any"),
+    owner_id: str | None = Query(None, description="Specific owner ID"),
 ):
     """Все тикеты (требует права can_view_all_tickets или админ)."""
     # Обработка пустых значений
-    limit_int = int(limit) if limit and limit.strip() else 10
+    limit_int = int(limit) if limit and limit.strip() else 20
     offset_int = int(offset) if offset and offset.strip() else 0
-    
+
     # Передаём agent_id для проверок прав в сервисе
     ticket_service = TicketService(db, agent_id=agent.id)
     category_service = QuestionCategoryService(db)
@@ -435,6 +448,13 @@ def tickets_all(
     if q and not any(filters.get(k) for k in ("track_id", "subject", "customer_name", "customer_email")):
         filters["track_id"] = q.strip()
 
+    # Фильтр по назначению
+    if owner_filter == "unassigned":
+        filters["owner_id"] = None
+    elif owner_filter == "assigned" and owner_id and owner_id.strip():
+        filters["owner_id"] = int(owner_id)
+    # Если owner_filter == "any" — не фильтруем по owner_id
+
     # Фильтр по архиву
     if archived == "active":
         filters["is_archived"] = False
@@ -447,19 +467,22 @@ def tickets_all(
         sort_desc=sort_desc,
         limit=limit_int,
         offset=offset_int,
+        include_unread=True,
+        agent_id=agent.id,
     )
     categories = category_service.list(limit=500)
     statuses = status_service.list(limit=200)
     agents = agent_service.list(filters={"is_active": True}, sort_by="full_name", limit=500)
     category_name_by_id = {c.id: c.name for c in categories}
     status_name_by_id = {s.id: s.name for s in statuses}
+    agent_name_by_id = {a.id: a.full_name for a in agents}
 
     # Получаем общее количество
     all_tickets = ticket_service.list(filters=filters if filters else None, limit=999999)
     total_count = len(all_tickets)
 
     return templates.TemplateResponse(
-        "tickets/all.html",
+        "operator/tickets/all.html",
         {
             "request": request,
             "tickets": tickets,
@@ -469,14 +492,19 @@ def tickets_all(
             "agents": agents,
             "category_name_by_id": category_name_by_id,
             "status_name_by_id": status_name_by_id,
+            "agent_name_by_id": agent_name_by_id,
             "filters": filters,
             "q": q,
             "sort_by": sort_by,
             "sort_desc": sort_desc,
             "limit": limit,
             "offset": offset,
-            "archived_filter": archived,
+            "archived": archived,
+            "owner_filter": owner_filter,
+            "owner_id": owner_id,
             "total_count": total_count,
+            "limit_int": limit_int,
+            "offset_int": offset_int,
             **agent.get_permissions_dict(),
         },
     )
@@ -535,6 +563,8 @@ def tickets_list(
         sort_desc=sort_desc,
         limit=limit_int,
         offset=offset_int,
+        include_unread=True,
+        agent_id=agent.id,
     )
     categories = category_service.list(limit=500)
     statuses = status_service.list(limit=200)
@@ -547,7 +577,7 @@ def tickets_list(
     total_count = len(all_tickets)
 
     return templates.TemplateResponse(
-        "tickets/list.html",
+        "operator/tickets/my.html",
         {
             "request": request,
             "tickets": tickets,
@@ -563,8 +593,10 @@ def tickets_list(
             "sort_desc": sort_desc,
             "limit": limit,
             "offset": offset,
-            "archived_filter": archived,
+            "archived": archived,
             "total_count": total_count,
+            "limit_int": limit_int,
+            "offset_int": offset_int,
             **agent.get_permissions_dict(),
         },
     )
@@ -588,7 +620,7 @@ def ticket_detail_admin(
         ticket = ticket_service.get(ticket_id=ticket_id)
     except NotFound:
         return templates.TemplateResponse(
-            "tickets/detail.html",
+            "operator/tickets/detail.html",
             {"request": request, "ticket": None, "error": "Тикет не найден", "agent": agent},
             status_code=404,
         )
@@ -641,7 +673,7 @@ def ticket_detail_admin(
     agent_name_by_id = {a.id: a.full_name for a in agents}
 
     return templates.TemplateResponse(
-        "tickets/detail.html",
+        "operator/tickets/detail.html",
         {
             "request": request,
             "ticket": ticket,
@@ -764,10 +796,16 @@ def admin_update_ticket(
     priority: str = Form(""),
     owner_id: str = Form(""),
     category_id: str = Form(""),
-    is_locked: str = Form("false"),
-    is_archived: str = Form("false"),
 ):
-    # Сервис сам проверит права внутри (двойная защита)
+    """
+    Обновление тикета с проверкой прав на каждое поле.
+    
+    Права:
+    - status_id: can_edit_tickets
+    - priority: can_edit_tickets
+    - owner_id: can_assign_tickets (или админ)
+    - category_id: can_man_cat (или админ)
+    """
     ticket_service = TicketService(
         db,
         agent_id=agent.id,
@@ -776,37 +814,45 @@ def admin_update_ticket(
     )
     update_data = {}
 
+    # Получаем права агента
+    perms = agent.get_permissions_dict()
+    is_admin = agent.role == 'admin'
+    
+    # Статус (требует can_edit_tickets)
     if status_id and status_id.isdigit():
-        update_data["status_id"] = int(status_id)
+        if perms.get('can_edit_tickets', False) or is_admin:
+            update_data["status_id"] = int(status_id)
 
+    # Приоритет (требует can_edit_tickets)
     if priority:
-        try:
-            update_data["priority"] = Priority(priority)
-        except ValueError:
-            pass
+        if perms.get('can_edit_tickets', False) or is_admin:
+            try:
+                update_data["priority"] = Priority(priority)
+            except ValueError:
+                pass
 
+    # Исполнитель (требует can_assign_tickets или админ)
     if owner_id and owner_id.isdigit():
-        owner_val = int(owner_id)
-        update_data["owner_id"] = owner_val if owner_val > 0 else None
+        if perms.get('can_assign_tickets', False) or is_admin:
+            owner_val = int(owner_id)
+            update_data["owner_id"] = owner_val if owner_val > 0 else None
 
+    # Категория (требует can_man_cat или админ)
     if category_id and category_id.isdigit():
-        cat_val = int(category_id)
-        update_data["category_id"] = cat_val if cat_val > 0 else None
+        if perms.get('can_man_cat', False) or is_admin:
+            cat_val = int(category_id)
+            update_data["category_id"] = cat_val if cat_val > 0 else None
 
-    update_data["is_locked"] = is_locked.lower() in ("true", "on", "1", "yes")
-    update_data["is_archived"] = is_archived.lower() in ("true", "on", "1", "yes")
-
-    clean_update = {k: v for k, v in update_data.items() if v is not None}
-
-    if clean_update:
+    # Применяем только изменённые поля
+    if update_data:
         try:
             ticket_service.update_ticket(
                 ticket_id=ticket_id,
-                ticket_data=TicketUpdate(**clean_update),
+                ticket_data=TicketUpdate(**update_data),
                 agent_id=agent.id,
             )
-            
-            # Логируем изменение тикета
+
+            # Логируем изменение
             client_info = get_client_info(request)
             log_service = AuditLogService(db)
             log_service.log_action(
@@ -814,13 +860,15 @@ def admin_update_ticket(
                 entity_type="ticket",
                 entity_id=ticket_id,
                 agent_id=agent.id,
-                details={"changes": clean_update},
+                details={"changes": update_data},
                 **client_info,
             )
+            
+            request.session["flash_success"] = "Тикет обновлён"
         except NotFound:
-            raise HTTPException(status_code=404, detail="Тикет не найден")
+            request.session["flash_error"] = "Тикет не найден"
         except Exception as e:
-            raise HTTPException(status_code=400, detail=f"Ошибка обновления: {str(e)}")
+            request.session["flash_error"] = f"Ошибка: {str(e)}"
 
     return RedirectResponse(url=f"/tickets/{ticket_id}", status_code=303)
 
@@ -931,9 +979,9 @@ async def tickets_bulk_operation(
     request: Request,
     db: Session = Depends(get_db),
     ticket_ids: str = Form(...),  # JSON array of ticket IDs
-    operation: str = Form(...),  # archive, delete, assign, change_status, mark_read
-    owner_id: int | None = Form(None),
-    status_id: int | None = Form(None),
+    operation: str = Form(...),  # archive, delete, assign, change_status, mark_read, hard_delete
+    owner_id: str | None = Form(None),
+    status_id: str | None = Form(None),
 ):
     """Массовые операции с тикетами."""
     import json
@@ -948,10 +996,12 @@ async def tickets_bulk_operation(
 
     try:
         ids = json.loads(ticket_ids)
-        if not isinstance(ids, list) or not all(isinstance(i, int) for i in ids):
+        if not isinstance(ids, list) or not all(isinstance(i, int) or (isinstance(i, str) and i.isdigit()) for i in ids):
             raise ValueError("Invalid ticket IDs")
-    except (json.JSONDecodeError, ValueError):
-        request.session["flash_error"] = "Неверный формат данных"
+        # Конвертируем в int если строки
+        ids = [int(i) if isinstance(i, str) else i for i in ids]
+    except (json.JSONDecodeError, ValueError) as e:
+        request.session["flash_error"] = f"Неверный формат данных: {e}"
         return RedirectResponse(url="/tickets", status_code=303)
 
     # Создаём сервисы после получения agent
@@ -1050,7 +1100,7 @@ async def tickets_bulk_operation(
                         agent_id=agent.id,
                     )
                     success_count += 1
-                    
+
                     # Логируем удаление
                     client_info = get_client_info(request)
                     log_service = AuditLogService(db)
@@ -1070,7 +1120,7 @@ async def tickets_bulk_operation(
                         agent_id=agent.id,
                     )
                     success_count += 1
-                    
+
                     # Логируем архивирование
                     client_info = get_client_info(request)
                     log_service = AuditLogService(db)
@@ -1080,6 +1130,26 @@ async def tickets_bulk_operation(
                         entity_id=ticket_id,
                         agent_id=agent.id,
                         details={"bulk_operation": "archive_fallback", "track_id": ticket.track_id},
+                        **client_info,
+                    )
+
+            elif operation == 'hard_delete':
+                if agent.has_permission('can_hard_del_tickets') or agent.role == 'admin':
+                    ticket_service.hard_delete_ticket(
+                        ticket_id=ticket_id,
+                        agent_id=agent.id,
+                    )
+                    success_count += 1
+
+                    # Логируем удаление
+                    client_info = get_client_info(request)
+                    log_service = AuditLogService(db)
+                    log_service.log_action(
+                        action="delete",
+                        entity_type="ticket",
+                        entity_id=ticket_id,
+                        agent_id=agent.id,
+                        details={"bulk_operation": "hard_delete", "track_id": ticket.track_id},
                         **client_info,
                     )
 
@@ -1433,20 +1503,20 @@ def get_available_operators(
 ):
     """
     Получить список операторов, доступных для назначения на тикет.
-    
+
     Операторы отбираются по категории вопроса, совпадающей с категорией тикета.
     Возвращает операторов с score (приоритетом назначения).
-    
+
     ?random=true — вернуть одного случайного оператора
     """
     from app.services.ticket.assignment_service import AssignmentService
     from app.models.ticket import Ticket
-    
+
     # Проверяем, что тикет существует
     ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
     if ticket is None:
         raise HTTPException(status_code=404, detail="Тикет не найден")
-    
+
     # Получаем доступных операторов (ищем по категории, НЕ по департаменту)
     assignment_service = AssignmentService(db)
     operators = assignment_service.get_available_operators(
@@ -1457,16 +1527,16 @@ def get_available_operators(
         limit=None,  # Сначала получаем всех
         random=False,  # Сами перемешаем после фильтрации
     )
-    
+
     # Сначала фильтруем только операторов с доступом (score > 0)
     suitable_operators = [op for op in operators if op.score > 0]
-    
+
     # Теперь перемешиваем и берём одного случайного
     if random and suitable_operators:
         import random as rnd
         rnd.shuffle(suitable_operators)
         suitable_operators = suitable_operators[:1]
-    
+
     # Формируем ответ
     return {
         "ticket_id": ticket_id,
@@ -1491,3 +1561,130 @@ def get_available_operators(
             for op in suitable_operators
         ],
     }
+
+
+# =============================================================================
+# Управление банами (Email и IP)
+# =============================================================================
+
+@router.get("/bans", response_class=HTMLResponse)
+def bans_list(
+    request: Request,
+    agent: AgentRead = Depends(check_can_view_tickets),  # Требуется право просмотра тикетов
+    db: Session = Depends(get_db),
+):
+    """Страница управления банами (email и IP)."""
+    ban_service = BanService(db)
+    banned_emails = ban_service.get_banned_emails(db)
+    banned_ips = ban_service.get_banned_ips(db)
+    
+    return templates.TemplateResponse(
+        "operator/bans/list.html",
+        {
+            "request": request,
+            "agent": agent,
+            "banned_emails": banned_emails,
+            "banned_ips": banned_ips,
+        },
+    )
+
+
+@router.post("/bans/email/add", response_class=RedirectResponse)
+def ban_email_add(
+    request: Request,
+    agent: AgentRead = Depends(check_can_view_tickets),
+    db: Session = Depends(get_db),
+    email: str = Form(...),
+    reason: str = Form(""),
+):
+    """Добавить email в бан-лист."""
+    ban_service = BanService(db)
+    
+    try:
+        ban_service.add_email_ban(
+            db=db,
+            email=email.strip(),
+            banned_by=agent.id,
+            reason=reason.strip() if reason else None,
+        )
+        request.session["flash_success"] = f"Email '{email}' добавлен в чёрный список."
+    except ValueError as e:
+        request.session["flash_error"] = str(e)
+    
+    return RedirectResponse(url="/bans", status_code=303)
+
+
+@router.post("/bans/email/remove", response_class=RedirectResponse)
+def ban_email_remove(
+    request: Request,
+    ban_id: int = Form(...),
+    agent: AgentRead = Depends(check_can_view_tickets),
+    db: Session = Depends(get_db),
+):
+    """Удалить email из бан-листа."""
+    ban_service = BanService(db)
+    
+    if ban_service.remove_email_ban(db, ban_id):
+        request.session["flash_success"] = "Email удалён из чёрного списка."
+    else:
+        request.session["flash_error"] = "Бан не найден."
+    
+    return RedirectResponse(url="/bans", status_code=303)
+
+
+@router.post("/bans/ip/add", response_class=RedirectResponse)
+def ban_ip_add(
+    request: Request,
+    agent: AgentRead = Depends(check_can_view_tickets),
+    db: Session = Depends(get_db),
+    ip_from: str = Form(...),
+    ip_to: str = Form(""),
+    ip_display: str = Form(""),
+):
+    """Добавить IP или диапазон IP в бан-лист."""
+    from app.services.utils import ip_to_int
+    
+    ban_service = BanService(db)
+    
+    try:
+        # Валидация IP
+        ip_to_int(ip_from)
+        ip_to_val = ip_to.strip() if ip_to and ip_to.strip() else None
+        if ip_to_val:
+            ip_to_int(ip_to_val)
+        
+        ban_service.add_ip_ban(
+            db=db,
+            ip_from=ip_from.strip(),
+            ip_to=ip_to_val if ip_to_val else None,
+            banned_by=agent.id,
+            ip_display=ip_display.strip() if ip_display and ip_display.strip() else None,
+        )
+        
+        display = ip_display.strip() if ip_display and ip_display.strip() else (
+            f"{ip_from} - {ip_to_val}" if ip_to_val else ip_from
+        )
+        request.session["flash_success"] = f"IP-диапазон '{display}' добавлен в чёрный список."
+        
+    except ValueError as e:
+        request.session["flash_error"] = f"Неверный формат IP: {e}"
+    
+    return RedirectResponse(url="/bans", status_code=303)
+
+
+@router.post("/bans/ip/remove", response_class=RedirectResponse)
+def ban_ip_remove(
+    request: Request,
+    ban_id: int = Form(...),
+    agent: AgentRead = Depends(check_can_view_tickets),
+    db: Session = Depends(get_db),
+):
+    """Удалить IP из бан-листа."""
+    ban_service = BanService(db)
+    
+    if ban_service.remove_ip_ban(db, ban_id):
+        request.session["flash_success"] = "IP удалён из чёрного списка."
+    else:
+        request.session["flash_error"] = "Бан не найден."
+    
+    return RedirectResponse(url="/bans", status_code=303)

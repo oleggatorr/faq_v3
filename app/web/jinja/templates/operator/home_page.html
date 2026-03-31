@@ -1,91 +1,134 @@
+{# ===== ГЛАВНАЯ СТРАНИЦА ОПЕРАТОРА ===== #}
+
 {% extends "base.html" %}
 
-{% block title %}Домашняя страница оператора{% endblock %}
-
-{% block extra_css %}
-<style>
-  /* Прижимаем footer к низу */
-  main {
-    min-height: calc(100vh - 120px);
-    display: flex;
-    flex-direction: column;
-  }
-  
-  .content-wrapper {
-    flex: 1;
-  }
-</style>
-{% endblock %}
+{% block title %}Главная — Система поддержки{% endblock %}
 
 {% block content %}
-<div class="content-wrapper">
-<div class="container py-5">
-  <!-- Заголовок -->
-  <div class="row mb-4">
-    <div class="col-12">
-      <h1 class="display-6 fw-bold">👋 Добро пожаловать, {{ agent.full_name }}!</h1>
-      <p class="text-muted">
-        <span class="badge bg-primary">{{ agent.role_name }}</span>
-        {% if agent.department_id %}
-          <span class="badge bg-secondary ms-2">Департамент #{{ agent.department_id }}</span>
-        {% endif %}
-      </p>
-    </div>
+<div class="py-4">
+  <!-- Приветствие -->
+  <div class="text-center mb-5">
+    <h1 class="h3 mb-2" style="color: #1e293b; font-weight: 600;">
+      👋 С возвращением, {{ agent.full_name }}!
+    </h1>
+    <p class="text-muted">
+      {% if agent.role == 'admin' %}
+        Администратор | Департамент: {{ agent.department.name if agent.department else '—' }}
+      {% else %}
+        Оператор | Департамент: {{ agent.department.name if agent.department else '—' }}
+      {% endif %}
+    </p>
   </div>
 
-  <!-- Информационное поле -->
-  <div class="row mb-4">
-    <div class="col-12">
-      <div class="card border-0 shadow-sm">
-        <div class="card-header">
-          📌 Важная информация
-        </div>
-        <div class="card-body">
-          <p class="card-text">
-            _________________________________________________________________
+  <!-- Быстрые действия -->
+  <div class="row g-4 justify-content-center mb-5">
+    <div class="col-md-4">
+      <div class="card h-100 card-border-primary">
+        <div class="card-body text-center p-4">
+          <div class="mb-3" style="font-size: 2.5rem;">📋</div>
+          <h3 class="h6 mb-2">Мои тикеты</h3>
+          <p class="text-muted mb-3 small">
+            Тикеты, назначенные на вас
           </p>
-          <div class="alert alert-info mb-0">
-            ________________________________________________________________
-          </div>
+          <a href="/tickets/my" class="btn btn-primary btn-sm">
+            Перейти
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-4">
+      <div class="card h-100 card-border-success">
+        <div class="card-body text-center p-4">
+          <div class="mb-3" style="font-size: 2.5rem;">📥</div>
+          <h3 class="h6 mb-2">Неназначенные</h3>
+          <p class="text-muted mb-3 small">
+            Новые тикеты для назначения
+          </p>
+          <a href="/tickets/unassigned" class="btn btn-success btn-sm">
+            Перейти
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-4">
+      <div class="card h-100" style="border-left: 3px solid #0ea5e9 !important;">
+        <div class="card-body text-center p-4">
+          <div class="mb-3" style="font-size: 2.5rem;">📂</div>
+          <h3 class="h6 mb-2">Все тикеты</h3>
+          <p class="text-muted mb-3 small">
+            Полный список тикетов
+          </p>
+          <a href="/tickets/all" class="btn btn-sm" style="background-color: #0ea5e9; border-color: #0ea5e9; color: white;">
+            Перейти
+          </a>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Быстрые действия (заглушки) -->
-  <div class="row mb-4">
-    <div class="col-12">
-      <h2 class="h5 mb-3">⚡ Быстрые действия</h2>
+  <!-- Дополнительная навигация -->
+  <div class="row g-4 justify-content-center">
+    <div class="col-md-3">
+      <div class="card">
+        <div class="card-body text-center p-3">
+          <a href="/tickets/others" class="text-decoration-none" style="color: #1e293b;">
+            <div class="mb-2" style="font-size: 1.75rem;">👥</div>
+            <small style="font-weight: 500;">Чужие тикеты</small>
+          </a>
+        </div>
+      </div>
     </div>
 
-    <div class="col-md-3 mb-2">
-      <a href="/tickets/my" class="btn btn-primary w-100">
-        📋 Мои тикеты
-      </a>
+    <div class="col-md-3">
+      <div class="card">
+        <div class="card-body text-center p-3">
+          <a href="/tickets/create" class="text-decoration-none" style="color: #1e293b;">
+            <div class="mb-2" style="font-size: 1.75rem;">➕</div>
+            <small style="font-weight: 500;">Создать тикет</small>
+          </a>
+        </div>
+      </div>
     </div>
 
-    <div class="col-md-3 mb-2">
-      <a href="/tickets/unassigned" class="btn btn-outline-secondary w-100">
-        📥 Неназначенные
-      </a>
-    </div>
-
-    <div class="col-md-3 mb-2">
-      <button class="btn btn-outline-secondary w-100" disabled>
-        📊 Отчёты
-      </button>
-    </div>
-
-    <div class="col-md-3 mb-2">
-      <button class="btn btn-outline-secondary w-100" disabled>
-        📝 Задачи
-      </button>
+    <div class="col-md-3">
+      <div class="card">
+        <div class="card-body text-center p-3">
+          <a href="/accaunt" class="text-decoration-none" style="color: #1e293b;">
+            <div class="mb-2" style="font-size: 1.75rem;">⚙️</div>
+            <small style="font-weight: 500;">Настройки</small>
+          </a>
+        </div>
+      </div>
     </div>
   </div>
 
-  
-
-  
-</div>
+  <!-- Статистика (опционально) -->
+  <div class="card mt-5">
+    <div class="card-header">
+      📊 Быстрая статистика
+    </div>
+    <div class="card-body">
+      <div class="row text-center">
+        <div class="col-md-3">
+          <div class="mb-2" style="font-size: 2rem; color: #2563eb;">—</div>
+          <small class="text-muted">Мои тикеты</small>
+        </div>
+        <div class="col-md-3">
+          <div class="mb-2" style="font-size: 2rem; color: #16a34a;">—</div>
+          <small class="text-muted">В работе</small>
+        </div>
+        <div class="col-md-3">
+          <div class="mb-2" style="font-size: 2rem; color: #ca8a04;">—</div>
+          <small class="text-muted">Ожидают ответа</small>
+        </div>
+        <div class="col-md-3">
+          <div class="mb-2" style="font-size: 2rem; color: #64748b;">—</div>
+          <small class="text-muted">Закрыты сегодня</small>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 {% endblock %}

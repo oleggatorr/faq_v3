@@ -1,77 +1,82 @@
-<!doctype html>
+{# ===== БАЗОВЫЙ ШАБЛОН (BASE LAYOUT) ===== #}
+{# Корневой шаблон: подключает CSS, JS, включает header и footer #}
+{# Все остальные шаблоны наследуются от этого #}
+
+<!DOCTYPE html>
 <html lang="ru">
   <head>
+    {# Мета #}
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>{% block title %}Admin{% endblock %}</title>
+    <meta name="description" content="{% block meta_description %}Система поддержки клиентов{% endblock %}" />
+    
+    {# Заголовок страницы (переопределяется в дочерних шаблонах) #}
+    <title>{% block title %}Система поддержки{% endblock %}</title>
 
-    {# Bootstrap 5 CSS #}
+    {# ===== CSS: Bootstrap 5 #}
     <link href="/static/vendor/bootstrap/bootstrap.min.css" rel="stylesheet" />
-
-    {# Custom styles #}
+    
+    {# ===== CSS: Кастомные стили #}
     <link rel="stylesheet" href="/static/css/app.css" />
-
+    
+    {# ===== CSS: Дополнительные стили (переопределяется в дочерних шаблонах) #}
     {% block extra_css %}{% endblock %}
+
+    {# ===== CSS: Стили для layout #}
+    <style>
+      html, body {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+      }
+      
+      body {
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh;
+      }
+      
+      main.main {
+        flex: 1 0 auto;
+      }
+      
+      footer.footer {
+        flex-shrink: 0;
+      }
+    </style>
   </head>
+  
   <body>
-    {# Header / Navbar #}
-    <header>
-      {% include 'partials/_navbar.html' %}
+    {# ===== HEADER / ШАПКА ===== #}
+    <header class="header">
+      {% include 'partials/_header.html' %}
     </header>
 
-    {# Main content #}
-    <main class="py-4">
-      <div class="container-fluid px-4">
-        {# Flash messages #}
+    {# ===== MAIN / ОСНОВНОЙ КОНТЕНТ ===== #}
+    <main class="main py-4">
+      <div class="container px-4">
+        {# Flash-сообщения #}
         {% block alerts %}
           {% include 'partials/_flash.html' %}
         {% endblock %}
 
-        {# Page content #}
+        {# Контент страницы (переопределяется в дочерних шаблонах) #}
         {% block content %}{% endblock %}
       </div>
     </main>
 
-    {# Footer #}
-    <footer class="border-top py-3 mt-auto">
-      <div class="container-fluid px-4">
-        <p class="text-muted text-center mb-0">
-          <small>&copy; 2026 Admin Panel. All rights reserved.</small>
-        </p>
-      </div>
+    {# ===== FOOTER / ПОДВАЛ ===== #}
+    <footer class="footer">
+      {% include 'partials/_footer.html' %}
     </footer>
 
-    {# Bootstrap 5 JS Bundle #}
+    {# ===== JS: Bootstrap 5 Bundle #}
     <script src="/static/vendor/bootstrap/bootstrap.bundle.min.js"></script>
-
-    {# Custom scripts #}
+    
+    {# ===== JS: Кастомные скрипты #}
     <script src="/static/js/app.js"></script>
-    <!--
-    <script>
-      // Переключатель языков (заглушка)
-      document.addEventListener('DOMContentLoaded', function() {
-        const langLinks = document.querySelectorAll('[data-lang]');
-        const langDropdown = document.getElementById('langDropdown');
-        
-        langLinks.forEach(function(link) {
-          link.addEventListener('click', function(e) {
-            e.preventDefault();
-            const lang = this.getAttribute('data-lang');
-            const langName = this.textContent.trim();
-            
-            // Обновляем текст кнопки
-            if (langDropdown) {
-              langDropdown.innerHTML = '🌐 ' + langName;
-            }
-            
-            // Здесь будет логика переключения языка
-            console.log('Переключение на язык:', lang);
-            // TODO: Реализовать переключение языка
-          });
-        });
-      });
-    </script>
-    -->
+    
+    {# ===== JS: Дополнительные скрипты (переопределяется в дочерних шаблонах) #}
     {% block extra_js %}{% endblock %}
   </body>
 </html>

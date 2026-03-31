@@ -1,0 +1,143 @@
+{# ===== ФРАГМЕНТ: ШАПКА / HEADER ===== #}
+{# Двухуровневая навигация #}
+
+{# ВЕРХНЯЯ ПАНЕЛЬ: Логотип + Профиль #}
+<div class="top-navbar border-bottom bg-white">
+  <div class="container px-4">
+    <div class="d-flex justify-content-between align-items-center py-2">
+      {# Логотип #}
+      <a class="navbar-brand d-flex align-items-center" href="/">
+        <img src="/static/stc/logo_5.png" alt="Logo" height="40" class="me-2" />
+        <span class="fw-semibold text-dark fs-5">Система поддержки</span>
+      </a>
+
+      {# Профиль / Вход #}
+      {% if agent %}
+        <div class="dropdown">
+          <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+            👤 {{ agent.login }}
+            <span class="badge {% if agent.role == 'admin' %}bg-danger{% else %}bg-secondary{% endif %} ms-1">
+              {% if agent.role == 'admin' %}Админ{% else %}Оператор{% endif %}
+            </span>
+          </a>
+          <ul class="dropdown-menu dropdown-menu-end">
+            <li><a class="dropdown-item" href="/accaunt">⚙️ Настройки</a></li>
+            <li><hr class="dropdown-divider"></li>
+            <li>
+              <form method="post" action="/logout" class="d-inline">
+                <button type="submit" class="dropdown-item text-danger">🚪 Выход</button>
+              </form>
+            </li>
+          </ul>
+        </div>
+      {% else %}
+        <a href="/login" class="btn btn-outline-primary btn-sm">
+            🔐 Войти
+        </a>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{# НИЖНЯЯ ПАНЕЛЬ: Навигация для авторизованных #}
+{% if agent %}
+<div class="admin-navbar bg-light border-bottom">
+  <div class="container px-4">
+    <ul class="nav justify-content-start py-2">
+      <!-- Главная -->
+      <li class="nav-item">
+        <a class="nav-link px-3" href="/operator/home-page">
+          🏠 Главная
+        </a>
+      </li>
+
+      <!-- Мои тикеты -->
+      <li class="nav-item">
+        <a class="nav-link px-3" href="/tickets/my">
+          📋 Мои тикеты
+          {% if agent %}
+            {% set unread = get_unread_count(agent.id) %}
+            {% if unread and unread > 0 %}
+              <span class="badge bg-danger ms-1">{{ unread }}</span>
+            {% endif %}
+          {% endif %}
+        </a>
+      </li>
+
+      <!-- Список тикетов -->
+      <li class="nav-item">
+        <a class="nav-link px-3" href="/tickets/all">
+          📂 Список тикетов
+        </a>
+      </li>
+
+      <!-- Агенты (только для админа) -->
+      {% if agent.role == 'admin' %}
+      <li class="nav-item">
+        <a class="nav-link px-3" href="/agents">
+          👥 Агенты
+        </a>
+      </li>
+      {% endif %}
+
+      <!-- Департаменты -->
+      <li class="nav-item">
+        <a class="nav-link px-3" href="/departments">
+          🏢 Департаменты
+        </a>
+      </li>
+
+      <!-- Категории -->
+      <li class="nav-item">
+        <a class="nav-link px-3" href="/question-category-list">
+          📁 Категории
+        </a>
+      </li>
+
+      <!-- Баны -->
+      <li class="nav-item">
+        <a class="nav-link px-3" href="/bans">
+          🚫 Баны
+        </a>
+      </li>
+
+      <!-- Логи (только для админа) -->
+      {% if agent.role == 'admin' %}
+      <li class="nav-item">
+        <a class="nav-link px-3" href="/logs">
+          📊 Логи
+        </a>
+      </li>
+      {% endif %}
+    </ul>
+  </div>
+</div>
+{% else %}
+{# НИЖНЯЯ ПАНЕЛЬ: 4 кнопки для гостей #}
+<div class="bottom-navbar bg-light border-bottom">
+  <div class="container px-4">
+    <ul class="nav justify-content-center py-2">
+      <li class="nav-item">
+        <a class="nav-link px-4" href="/mail" target="_blank">
+          📧 Почта
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link px-4" href="/1c" target="_blank">
+          📘 1С
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link px-4" href="/documents" target="_blank">
+          📄 Документы
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link px-4" href="/" class="active">
+          🎧 Поддержка
+        </a>
+      </li>
+    </ul>
+  </div>
+</div>
+{% endif %}

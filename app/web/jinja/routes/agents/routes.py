@@ -70,7 +70,7 @@ def agents_list(
     ).order_by(QuestionCategory.name).all()
 
     return templates.TemplateResponse(
-        "agents/list.html",
+        "operator/agents/list.html",
         {
             "request": request,
             "agents": agents,
@@ -107,7 +107,7 @@ def add_agent_form(
     )
 
     return templates.TemplateResponse(
-        "agents/add.html",
+        "operator/agents/add.html",
         {
             "request": request,
             "agent": agent,
@@ -157,7 +157,7 @@ def add_agent_submit(
             limit=200,
         )
         return templates.TemplateResponse(
-            "agents/add.html",
+            "operator/agents/add.html",
             {
                 "request": request,
                 "agent": agent,
@@ -196,7 +196,7 @@ def add_agent_submit(
             limit=200,
         )
         return templates.TemplateResponse(
-            "agents/add.html",
+            "operator/agents/add.html",
             {
                 "request": request,
                 "agent": agent,
@@ -426,7 +426,7 @@ def edit_agent_form(
     selected_permissions = target_agent.permissions.split(",") if target_agent.permissions else []
 
     return templates.TemplateResponse(
-        "agents/edit.html",
+        "operator/agents/edit.html",
         {
             "request": request,
             "agent": agent,
@@ -482,7 +482,7 @@ def edit_agent_submit(
             query_service = AgentQueryService(db, current_agent_id=agent.id)
             target_agent = query_service.get(agent_id=agent_id)
             return templates.TemplateResponse(
-                "agents/edit.html",
+                "operator/agents/edit.html",
                 {
                     "request": request,
                     "agent": agent,
@@ -492,6 +492,7 @@ def edit_agent_submit(
                     "error": "Пароли не совпадают",
                     "permissions_list": list(Permission),
                     "permission_labels": PERMISSION_LABELS,
+                    "permission_groups": PERMISSION_GROUPS,
                     "selected_categories": category_access,
                     "selected_permissions": permissions,
                     **agent.get_permissions_dict(),

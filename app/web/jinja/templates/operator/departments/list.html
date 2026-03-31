@@ -1,0 +1,112 @@
+{# ===== ДЕПАРТАМЕНТЫ (ОПЕРАТОР) ===== #}
+
+{% extends "base.html" %}
+
+{% block title %}Департаменты — Система поддержки{% endblock %}
+
+{% block extra_css %}
+<style>
+  .page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 1rem !important;
+    margin-bottom: 1.5rem !important;
+    border-bottom: 2px solid #e5e5e5 !important;
+  }
+  
+  .page-header h1 {
+    color: #1e293b !important;
+    font-weight: 600 !important;
+    font-size: 1.5rem !important;
+    margin-bottom: 0 !important;
+  }
+  
+  .content-card {
+    background-color: #ffffff !important;
+    border: 1px solid #e5e5e5 !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04) !important;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="py-4">
+  <!-- Заголовок -->
+  <div class="page-header">
+    <h1 class="mb-0">🏢 Департаменты</h1>
+    {% if agent_create %}
+      <a href="/departments/add" class="btn btn-primary btn-sm">➕ Добавить</a>
+    {% endif %}
+  </div>
+
+  {% if error %}
+    <div class="alert alert-danger" role="alert">
+      {{ error }}
+    </div>
+  {% endif %}
+
+  <!-- Таблица -->
+  <div class="content-card">
+    {% if departments and departments|length > 0 %}
+      <div class="table-responsive">
+        <table class="table table-hover mb-0">
+          <thead>
+            <tr>
+              <th style="width: 80px;">ID</th>
+              <th>Название</th>
+              <th style="width: 120px;">Email</th>
+              <th style="width: 100px;">Сортировка</th>
+              <th style="width: 80px;">Статус</th>
+              <th style="width: 120px;" class="text-end">Действия</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for d in departments %}
+            <tr>
+              <td class="text-muted small">{{ d.id }}</td>
+              <td>
+                <strong>{{ d.name }}</strong>
+                {% if d.description %}
+                  <br><small class="text-muted">{{ d.description[:80] }}{% if d.description|length > 80 %}...{% endif %}</small>
+                {% endif %}
+              </td>
+              <td class="small">
+                {% if d.email %}
+                  <a href="mailto:{{ d.email }}">{{ d.email }}</a>
+                {% else %}
+                  <span class="text-muted">—</span>
+                {% endif %}
+              </td>
+              <td class="small text-center">{{ d.sort_order }}</td>
+              <td>
+                {% if d.is_active %}
+                  <span class="badge bg-success">Активен</span>
+                {% else %}
+                  <span class="badge bg-secondary">Неактивен</span>
+                {% endif %}
+              </td>
+              <td class="text-end">
+                {% if agent_edit %}
+                  <a href="/departments/{{ d.id }}/edit" class="btn btn-sm btn-outline-primary" title="Редактировать">✏️</a>
+                {% endif %}
+                {% if agent_delete %}
+                  <form method="post" action="/departments/{{ d.id }}/delete" class="d-inline"
+                        onsubmit="return confirm('Удалить департамент {{ d.name }}?');">
+                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Удалить">🗑️</button>
+                  </form>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="alert alert-info m-3 mb-0">
+        📭 Департаменты не найдены.
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

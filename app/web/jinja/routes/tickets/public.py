@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
 from starlette.responses import FileResponse
@@ -27,6 +28,47 @@ from ..main import templates
 router = APIRouter(prefix="", tags=["tickets-public"])
 
 
+def _validate_track_id(track_id: str) -> tuple[bool, str]:
+    """
+    Проверить формат трек-номера.
+    
+    Допустимые форматы:
+    - XXX-XXX-XXXX (например, ABC-123-DEF456)
+    - XXXXXX (например, ABC123)
+    
+    Returns:
+        (True, "") если формат верный
+        (False, "сообщение об ошибке") если формат неверный
+    """
+    track_id = track_id.strip().upper()
+    
+    # Пустой трек-номер
+    if not track_id:
+        return False, "Введите трек-номер"
+    
+    # Слишком короткий
+    if len(track_id) < 6:
+        return False, "Трек-номер слишком короткий"
+    
+    # Слишком длинный
+    if len(track_id) > 20:
+        return False, "Трек-номер слишком длинный"
+    
+    # Разрешённые символы: буквы, цифры, дефис
+    if not re.match(r'^[A-Z0-9\-]+$', track_id):
+        return False, "Трек-номер должен содержать только буквы, цифры и дефисы"
+    
+    # Если есть дефисы, проверяем формат XXX-XXX-XXXX
+    if '-' in track_id:
+        parts = track_id.split('-')
+        if len(parts) != 3:
+            return False, "Неверный формат трек-номера (ожидается XXX-XXX-XXXX)"
+        if any(len(p) == 0 for p in parts):
+            return False, "Трек-номер не должен содержать пустых частей"
+    
+    return True, ""
+
+
 @router.get("/new-ticket", response_class=HTMLResponse)
 def new_ticket_form(
     request: Request,
@@ -41,7 +83,7 @@ def new_ticket_form(
     languages = lang_service.list(filters={"is_active": True}, sort_by="sort_order", limit=100)
     categories = cat_service.list(filters={"is_active": True}, sort_by="sort_order", limit=200)
     return templates.TemplateResponse(
-        "tickets/new.html",
+        "public/new_ticket.html",
         {
             "request": request,
             "departments": departments,
@@ -57,9 +99,9 @@ def new_ticket_form(
 
 @router.get("/get-ticket", response_class=HTMLResponse)
 def get_ticket_form(request: Request, agent: CurrentAgentOptional):
-    """Публичная форма: ввод track_id + email для доступа к переписке."""
+    """Публичная форма: ввод track_id для доступа к переписке."""
     return templates.TemplateResponse(
-        "tickets/get_ticket.html",
+        "public/find_ticket.html",
         {"request": request, "agent": agent, "error": None},
     )
 
@@ -69,6 +111,24 @@ def get_ticket_submit(
     track_id: str = Form(...),
 ):
     track_id = track_id.strip().upper()
+    return RedirectResponse(url=f"/ticket/{track_id}/message", status_code=303)
+
+
+@router.post("/ticket/", response_class=RedirectResponse)
+def ticket_search_submit(
+    request: Request,
+    track_id: str = Form(...),
+):
+    """Поиск тикета по трек-номеру (из формы)."""
+    track_id = track_id.strip().upper()
+    
+    # Валидация формата
+    is_valid, error_message = _validate_track_id(track_id)
+    if not is_valid:
+        # Сохраняем ошибку в сессию и возвращаем на страницу поиска
+        request.session["flash_error"] = error_message
+        return RedirectResponse(url="/get-ticket", status_code=303)
+    
     return RedirectResponse(url=f"/ticket/{track_id}/message", status_code=303)
 
 
@@ -94,15 +154,11 @@ def ticket_by_track_id(
         ticket = ticket_service.get_by_track_id(track_id)
     except ServiceNotFound:
         return templates.TemplateResponse(
-            "tickets/detail.html",
+            "public/find_ticket.html",
             {
                 "request": request,
-                "ticket": None,
-                "messages": [],
-                "events": [],
-                "attachments_by_message": {},
-                "error": "Тикет не найден",
                 "agent": agent,
+                "error": "Заявка с таким трек-номером не найдена",
             },
             status_code=404,
         )
@@ -123,13 +179,23 @@ def ticket_messages_by_track_id(
     - пользователь (без авторизации): публичный чат по track_id
     """
     track_id = track_id.strip().upper()
+    
+    # Валидация формата
+    is_valid, error_message = _validate_track_id(track_id)
+    if not is_valid:
+        return templates.TemplateResponse(
+            "public/find_ticket.html",
+            {"request": request, "agent": agent, "error": error_message},
+            status_code=400,
+        )
+    
     ticket_service = TicketService(db, agent_id=agent.id if agent else None)
     try:
         ticket = ticket_service.get_by_track_id(track_id)
     except ServiceNotFound:
         return templates.TemplateResponse(
-            "tickets/get_ticket.html",
-            {"request": request, "agent": agent, "error": "Тикет не найден"},
+            "public/find_ticket.html",
+            {"request": request, "agent": agent, "error": "Заявка с таким трек-номером не найдена"},
             status_code=404,
         )
 
@@ -169,7 +235,7 @@ def ticket_messages_by_track_id(
     agent_login_by_id = {a.id: a.login for a in agents}
 
     return templates.TemplateResponse(
-        "tickets/public_chat.html",
+        "public/ticket_chat.html",
         {
             "request": request,
             "agent": None,
@@ -302,7 +368,8 @@ async def new_ticket_submit(
 ):
     """Публичное создание тикета. После успеха — страница с трек-номером."""
     from app.web.jinja.routes.utils import _parse_int
-    
+    from app.services.ban_service import BanService
+
     dept_service = DepartmentService(db)
     lang_service = LanguageService(db)
     cat_service = QuestionCategoryService(db)
@@ -326,6 +393,39 @@ async def new_ticket_submit(
     customer_ip = request.client.host if request.client else "0.0.0.0"
     if len(customer_ip) > 45:
         customer_ip = customer_ip[:45]
+
+    # Проверка на бан по email и IP
+    if BanService.is_email_banned(db, customer_email):
+        return templates.TemplateResponse(
+            "public/new_ticket.html",
+            {
+                "request": request,
+                "departments": departments,
+                "languages": languages,
+                "categories": categories,
+                "priorities": list(Priority),
+                "agent": None,
+                "error": "Доступ заблокирован: ваш email находится в чёрном списке.",
+                "form_data": form_data,
+            },
+            status_code=403,
+        )
+
+    if BanService.is_ip_banned(db, customer_ip):
+        return templates.TemplateResponse(
+            "public/new_ticket.html",
+            {
+                "request": request,
+                "departments": departments,
+                "languages": languages,
+                "categories": categories,
+                "priorities": list(Priority),
+                "agent": None,
+                "error": "Доступ заблокирован: ваш IP-адрес находится в чёрном списке.",
+                "form_data": form_data,
+            },
+            status_code=403,
+        )
 
     ticket_service = TicketService(db, ticket_event_service=TicketEventService(db))
     try:
@@ -434,7 +534,7 @@ async def new_ticket_submit(
     request.session["flash_success"] = f"Обращение успешно создано! Трек-номер: {ticket.track_id}"
 
     return templates.TemplateResponse(
-        "tickets/created.html",
+        "public/created.html",
         {
             "request": request,
             "track_id": ticket.track_id,

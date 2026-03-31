@@ -1,7 +1,7 @@
-{# Flash messages component #}
-{# Отображает временные сообщения из сессии #}
+{# ===== ФРАГМЕНТ: FLASH-СООБЩЕНИЯ ===== #}
+{# Отображение временных сообщений из сессии #}
 
-{% with 
+{% with
   flash_messages = [
     {'type': 'success', 'message': request.session.pop('flash_success', None)},
     {'type': 'danger', 'message': request.session.pop('flash_error', None)},
@@ -13,15 +13,15 @@
     {% if flash.message %}
       <div class="alert alert-{{ flash.type }} alert-dismissible fade show" role="alert">
         {% if flash.type == 'success' %}
-          <span class="me-2">✅</span>
-        {% elif flash.type == 'error' %}
-          <span class="me-2">❌</span>
+          <strong>✓</strong>
+        {% elif flash.type == 'danger' %}
+          <strong>✕</strong>
         {% elif flash.type == 'warning' %}
-          <span class="me-2">⚠️</span>
+          <strong>⚠</strong>
         {% elif flash.type == 'info' %}
-          <span class="me-2">ℹ️</span>
+          <strong>ℹ</strong>
         {% endif %}
-        <strong>{{ flash.message }}</strong>
+        {{ flash.message }}
         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
       </div>
     {% endif %}

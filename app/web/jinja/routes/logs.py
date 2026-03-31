@@ -56,7 +56,7 @@ def logs_list(
     all_agents = agent_service.list(limit=500)
     
     return templates.TemplateResponse(
-        "logs/list.html",
+        "operator/logs/list.html",
         {
             "request": request,
             "agent": agent,

@@ -295,6 +295,10 @@ class TicketService(TicketBaseService):
                 ticket_dict = ticket.__dict__.copy()
                 if '_sa_instance_state' in ticket_dict:
                     del ticket_dict['_sa_instance_state']
+                # Удаляем служебные атрибуты Pydantic
+                for key in list(ticket_dict.keys()):
+                    if key.startswith('_'):
+                        del ticket_dict[key]
 
                 # Если тикет анонимизирован, заменяем данные на "Аноним"
                 if ticket.is_anonymized:
@@ -303,7 +307,8 @@ class TicketService(TicketBaseService):
 
                 # Считаем непрочитанные сообщения
                 unread_count = self.get_unread_count(ticket_id=ticket.id)
-                ticket_read = TicketRead(**ticket_dict, unread_count=unread_count)
+                ticket_dict['unread_count'] = unread_count
+                ticket_read = TicketRead(**ticket_dict)
                 ticket_read_list.append(ticket_read)
             return ticket_read_list
 

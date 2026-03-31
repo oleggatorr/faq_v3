@@ -36,7 +36,7 @@ def question_category_list(
         offset=offset,
     )
     return templates.TemplateResponse(
-        "question_categories/list.html",
+        "operator/question_categories/list.html",
         {
             "request": request,
             "agent": agent,
@@ -63,7 +63,7 @@ def question_category_add(
     )
     
     return templates.TemplateResponse(
-        "question_categories/add.html",
+        "operator/question_categories/add.html",
         {
             "request": request,
             "agent": agent,
@@ -93,7 +93,7 @@ def question_category_change(
     )
     
     return templates.TemplateResponse(
-        "question_categories/change.html",
+        "operator/question_categories/edit.html",
         {
             "request": request,
             "agent": agent,

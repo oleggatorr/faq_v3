@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ipaddress
 import json
 from typing import Any, Iterable, List, Optional
 
@@ -93,4 +94,49 @@ def apply_sort(
 
     column = getattr(model, sort_by)
     return query.order_by(column.desc() if sort_desc else column.asc())
+
+
+# =============================================================================
+# Утилиты для работы с IP-адресами (для банов)
+# =============================================================================
+
+def ip_to_int(ip: str) -> int:
+    """
+    Преобразовать IPv4-адрес в integer (аналог MySQL INET_ATON).
+    Пример: '192.168.1.1' -> 3232235777
+    """
+    return int(ipaddress.IPv4Address(ip))
+
+
+def int_to_ip(ip_int: int) -> str:
+    """
+    Преобразовать integer обратно в IPv4-адрес (аналог MySQL INET_NTOA).
+    Пример: 3232235777 -> '192.168.1.1'
+    """
+    return str(ipaddress.IPv4Address(ip_int))
+
+
+def ip_in_range(ip: str, ip_from: int, ip_to: int) -> bool:
+    """
+    Проверить, попадает ли IP-адрес в диапазон [ip_from, ip_to].
+    """
+    ip_int = ip_to_int(ip)
+    return ip_from <= ip_int <= ip_to
+
+
+def ip_to_display(ip: str, mask: int | None = None) -> str:
+    """
+    Преобразовать IP в человекочитаемое представление.
+    Если указан mask (количество октетов), заменить остальные на '*'.
+    
+    Примеры:
+    - ip_to_display('192.168.1.1') -> '192.168.1.1'
+    - ip_to_display('192.168.1.1', mask=3) -> '192.168.1.*'
+    - ip_to_display('192.168.1.1', mask=2) -> '192.168.*.*'
+    """
+    octets = ip.split(".")
+    if mask is None:
+        return ip
+    result = octets[:mask] + ["*"] * (4 - mask)
+    return ".".join(result)
 

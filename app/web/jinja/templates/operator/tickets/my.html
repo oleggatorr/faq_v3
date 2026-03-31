@@ -1,0 +1,509 @@
+{# ===== МОИ ТИКЕТЫ (ОПЕРАТОР) ===== #}
+
+{% extends "base.html" %}
+
+{% block title %}Мои тикеты — Система поддержки{% endblock %}
+
+{% block extra_css %}
+<style>
+  .page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 1rem !important;
+    margin-bottom: 1.5rem !important;
+    border-bottom: 2px solid #e5e5e5 !important;
+  }
+  
+  .page-header h1 {
+    color: #1e293b !important;
+    font-weight: 600 !important;
+    font-size: 1.5rem !important;
+    margin-bottom: 0 !important;
+  }
+  
+  .filters-card {
+    background-color: #ffffff !important;
+    border: 1px solid #e5e5e5 !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04) !important;
+    margin-bottom: 1.5rem !important;
+  }
+  
+  .content-card {
+    background-color: #ffffff !important;
+    border: 1px solid #e5e5e5 !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04) !important;
+  }
+  
+  .selected-actions {
+    background-color: #f9fafb;
+    border-bottom: 1px solid #e5e5e5;
+    padding: 1rem;
+    display: none;
+  }
+  
+  .selected-actions.active {
+    display: block;
+  }
+  
+  .table tbody tr.selected {
+    background-color: #eff6ff !important;
+  }
+  
+  .ticket-track-id {
+    font-family: monospace;
+    font-size: 0.875rem;
+    color: #2563eb;
+    font-weight: 600;
+  }
+  
+  .unread-badge {
+    background-color: #dc2626;
+    color: white;
+    font-size: 0.75rem;
+    padding: 0.125rem 0.5rem;
+    border-radius: 9999px;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="py-4">
+  <!-- Заголовок -->
+  <div class="page-header">
+    <h1 class="mb-0">📋 Мои тикеты</h1>
+    <div>
+      <a href="/new-ticket" class="btn btn-outline-secondary btn-sm">➕ Создать</a>
+      <a href="/tickets/all" class="btn btn-outline-secondary btn-sm ms-2">📂 Все</a>
+      <a href="/tickets/unassigned" class="btn btn-outline-secondary btn-sm ms-2">📥 Неназначенные</a>
+      <a href="/tickets/others" class="btn btn-outline-secondary btn-sm ms-2">� Чужие</a>
+    </div>
+  </div>
+
+  <!-- Фильтры -->
+  <div class="filters-card">
+    <div class="card-body p-3">
+      <form method="get" action="/tickets/my">
+        <div class="row g-2 align-items-end">
+          <!-- Поиск -->
+          <div class="col-md-3">
+            <label class="form-label small text-muted mb-1">Поиск</label>
+            <input type="text" class="form-control form-control-sm" name="q" placeholder="Трек или тема" value="{{ request.query_params.get('q', '') }}" />
+          </div>
+
+          <!-- Статус -->
+          <div class="col-md-2">
+            <label class="form-label small text-muted mb-1">Статус</label>
+            <select name="status_id" class="form-select form-select-sm">
+              <option value="">Все</option>
+              {% for s in statuses %}
+                <option value="{{ s.id }}" {% if status_id == s.id|string %}selected{% endif %}>{{ s.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <!-- Категория -->
+          <div class="col-md-2">
+            <label class="form-label small text-muted mb-1">Категория</label>
+            <select name="category_id" class="form-select form-select-sm">
+              <option value="">Все</option>
+              {% for c in categories %}
+                <option value="{{ c.id }}" {% if category_id == c.id|string %}selected{% endif %}>{{ c.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <!-- Архив -->
+          <div class="col-md-2">
+            <label class="form-label small text-muted mb-1">Архив</label>
+            <select name="archived" class="form-select form-select-sm">
+              <option value="active" {% if archived == 'active' %}selected{% endif %}>Активные</option>
+              <option value="archived" {% if archived == 'archived' %}selected{% endif %}>Архив</option>
+              <option value="all" {% if archived == 'all' %}selected{% endif %}>Все</option>
+            </select>
+          </div>
+
+          <!-- Кнопки -->
+          <div class="col-md-3 d-flex gap-2">
+            <button type="submit" class="btn btn-sm btn-primary">🔍</button>
+            <a href="/tickets/my" class="btn btn-sm btn-outline-secondary">✕</a>
+          </div>
+        </div>
+
+        <!-- Дополнительные настройки -->
+        <details class="mt-3">
+          <summary class="text-muted small" style="cursor: pointer;">⚙️ Дополнительные настройки</summary>
+          <div class="row g-2 align-items-end mt-2 pt-3 border-top">
+            <div class="col-md-2">
+              <label class="form-label small text-muted mb-1">Сортировка</label>
+              <select name="sort_by" class="form-select form-select-sm">
+                <option value="created_at" {% if sort_by == 'created_at' %}selected{% endif %}>Дата создания</option>
+                <option value="updated_at" {% if sort_by == 'updated_at' %}selected{% endif %}>Дата обновления</option>
+                <option value="track_id" {% if sort_by == 'track_id' %}selected{% endif %}>Трек-номер</option>
+                <option value="status_id" {% if sort_by == 'status_id' %}selected{% endif %}>Статус</option>
+                <option value="priority" {% if sort_by == 'priority' %}selected{% endif %}>Приоритет</option>
+              </select>
+            </div>
+
+            <div class="col-md-2">
+              <div class="form-check mt-4">
+                <input type="checkbox" class="form-check-input" name="sort_desc" value="true" id="sort_desc" {% if sort_desc %}checked{% endif %} />
+                <label class="form-check-label small" for="sort_desc">По убыванию</label>
+              </div>
+            </div>
+
+            <div class="col-md-2">
+              <label class="form-label small text-muted mb-1">Лимит</label>
+              <input type="number" class="form-control form-control-sm" name="limit" value="{{ limit if limit else '20' }}" min="1" max="500" />
+            </div>
+          </div>
+        </details>
+      </form>
+    </div>
+  </div>
+
+  <!-- Таблица тикетов -->
+  <div class="content-card">
+    <!-- Панель действий с выделенными -->
+    <div class="selected-actions" id="selectedActions">
+      <div class="d-flex justify-content-between align-items-center">
+        <span class="text-muted small">
+          Выделено: <strong id="selectedCount">0</strong>
+        </span>
+        <div class="btn-group" role="group">
+          <button type="button" class="btn btn-sm btn-outline-success" onclick="applyToSelected('mark_read')" title="Прочитано">✅</button>
+          {% if can_del_tickets or agent.role == 'admin' %}
+          <button type="button" class="btn btn-sm btn-outline-primary" onclick="applyToSelected('archive')" title="В архив">🗑️</button>
+          {% endif %}
+          {% if can_hard_del_tickets or agent.role == 'admin' %}
+          <button type="button" class="btn btn-sm btn-outline-danger" onclick="applyToSelected('hard_delete')" title="Удалить навсегда">🔥</button>
+          {% endif %}
+          {% if can_assign_tickets or agent.role == 'admin' %}
+          <button type="button" class="btn btn-sm btn-outline-secondary" onclick="showAssignModal()" title="Назначить">👤</button>
+          {% endif %}
+          <button type="button" class="btn btn-sm btn-outline-secondary" onclick="showStatusModal()" title="Статус">📊</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Модальное окно назначения -->
+    <div class="modal fade" id="assignModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header bg-success text-white">
+            <h6 class="modal-title fs-6">👤 Назначить исполнителя</h6>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <p class="mb-2 small">Выберите оператора:</p>
+            <select id="assignOwner" class="form-select form-select-sm">
+              <option value="">— Выберите —</option>
+              {% for a in agents|default([]) %}
+                <option value="{{ a.id }}">{{ a.full_name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="modal-footer py-2">
+            <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Отмена</button>
+            <button type="button" class="btn btn-sm btn-success" onclick="applyAssign()">Назначить</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Модальное окно статуса -->
+    <div class="modal fade" id="statusModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header bg-secondary text-white">
+            <h6 class="modal-title fs-6">📊 Изменить статус</h6>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <p class="mb-2 small">Выберите статус:</p>
+            <select id="changeStatus" class="form-select form-select-sm">
+              <option value="">— Выберите —</option>
+              {% for s in statuses %}
+                <option value="{{ s.id }}">{{ s.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="modal-footer py-2">
+            <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Отмена</button>
+            <button type="button" class="btn btn-sm btn-secondary" onclick="applyChangeStatus()">Применить</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Модальное окно подтверждения удаления -->
+    <div class="modal fade" id="deleteConfirmModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header bg-danger text-white">
+            <h6 class="modal-title fs-6">⚠️ Подтверждение удаления</h6>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <p class="mb-2"><strong>Вы действительно хотите удалить выбранные тикеты?</strong></p>
+            <p class="text-danger small mb-0">Это действие необратимо! Все сообщения и история будут удалены.</p>
+          </div>
+          <div class="modal-footer py-2">
+            <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Отмена</button>
+            <button type="button" class="btn btn-sm btn-danger" onclick="confirmHardDelete()">Удалить</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Таблица -->
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead>
+          <tr>
+            <th style="width: 40px;"><input type="checkbox" class="form-check-input" id="selectAll" onchange="toggleSelectAll()"></th>
+            <th style="width: 100px;">Трек</th>
+            <th>Тема</th>
+            <th style="width: 120px;">Статус</th>
+            <th style="width: 100px;">Приоритет</th>
+            <th style="width: 120px;">Создан</th>
+            <th style="width: 80px;" class="text-center">📬</th>
+            <th style="width: 50px;"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if tickets %}
+            {% for t in tickets %}
+            <tr class="{% if t.unread_count and t.unread_count > 0 %}table-active{% endif %}" id="row-{{ t.id }}">
+              <td>
+                <input type="checkbox" class="form-check-input ticket-checkbox" value="{{ t.id }}" onchange="updateSelectedCount()">
+              </td>
+              <td>
+                <a href="/tickets/{{ t.id }}" class="ticket-track-id">{{ t.track_id }}</a>
+              </td>
+              <td>
+                <a href="/tickets/{{ t.id }}" class="text-decoration-none" title="{{ t.subject }}">{{ t.subject[:60] }}{% if t.subject|length > 60 %}...{% endif %}</a>
+              </td>
+              <td>
+                <span class="badge {% if status_name_by_id.get(t.status_id, '') == 'Новый' %}bg-info{% elif status_name_by_id.get(t.status_id, '') == 'В работе' %}bg-warning{% elif status_name_by_id.get(t.status_id, '') == 'Закрыт' %}bg-success{% else %}bg-secondary{% endif %}">
+                  {{ status_name_by_id.get(t.status_id, t.status_id) }}
+                </span>
+              </td>
+              <td>
+                <span class="badge {% if t.priority.value == 'high' %}bg-danger{% elif t.priority.value == 'normal' %}bg-info{% elif t.priority.value == 'urgent' %}bg-danger{% else %}bg-secondary{% endif %}">
+                  {% if t.priority.value == 'low' %}🔹 Низкий{% elif t.priority.value == 'normal' %}🔸 Обычный{% elif t.priority.value == 'high' %}🔴 Высокий{% elif t.priority.value == 'urgent' %}🔴🔴 Критический{% endif %}
+                </span>
+              </td>
+              <td class="text-muted small">{{ t.created_at.strftime('%d.%m.%Y') }}</td>
+              <td class="text-center">
+                {% if t.unread_count and t.unread_count > 0 %}
+                  <span class="unread-badge">{{ t.unread_count }}</span>
+                {% else %}
+                  <span class="text-muted">—</span>
+                {% endif %}
+              </td>
+              <td>
+                <a href="/tickets/{{ t.id }}" class="btn btn-sm btn-outline-primary">→</a>
+              </td>
+            </tr>
+            {% endfor %}
+          {% else %}
+            <tr>
+              <td colspan="8" class="text-center text-muted py-5">
+                <div style="font-size: 3rem; margin-bottom: 1rem;">📋</div>
+                <p>Нет тикетов для отображения</p>
+                <a href="/tickets/unassigned" class="btn btn-primary btn-sm mt-2">📥 Взять из неназначенных</a>
+              </td>
+            </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Пагинация -->
+    {% if tickets and tickets|length > 0 %}
+    <div class="d-flex justify-content-between align-items-center p-3">
+      <p class="text-muted small mb-0">Показано {{ tickets|length }} из {{ total_count if total_count else tickets|length }}</p>
+      <nav>
+        <ul class="pagination pagination-sm mb-0">
+          {% if offset_int and offset_int > 0 %}
+            <li class="page-item">
+              <a class="page-link" href="?offset={{ offset_int - limit_int if offset_int - limit_int > 0 else 0 }}&limit={{ limit_int }}">← Назад</a>
+            </li>
+          {% endif %}
+          {% if tickets|length == limit_int %}
+            <li class="page-item">
+              <a class="page-link" href="?offset={{ offset_int + limit_int }}&limit={{ limit_int }}">Вперёд →</a>
+            </li>
+          {% endif %}
+        </ul>
+      </nav>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Выделить все/снять все
+function toggleSelectAll() {
+  const selectAll = document.getElementById('selectAll');
+  const checkboxes = document.querySelectorAll('.ticket-checkbox');
+  checkboxes.forEach(cb => {
+    cb.checked = selectAll.checked;
+    updateRowHighlight(cb);
+  });
+  updateSelectedCount();
+}
+
+// Обновить подсветку строки
+function updateRowHighlight(checkbox) {
+  const row = document.getElementById('row-' + checkbox.value);
+  if (checkbox.checked) {
+    row.classList.add('selected');
+  } else {
+    row.classList.remove('selected');
+  }
+}
+
+// Обновить счётчик выделенных
+function updateSelectedCount() {
+  const checkboxes = document.querySelectorAll('.ticket-checkbox:checked');
+  const count = checkboxes.length;
+  const panel = document.getElementById('selectedActions');
+  const countEl = document.getElementById('selectedCount');
+  
+  countEl.textContent = count;
+  if (count > 0) {
+    panel.classList.add('active');
+  } else {
+    panel.classList.remove('active');
+  }
+}
+
+// Получить выбранные ID
+function getSelectedIds() {
+  return Array.from(document.querySelectorAll('.ticket-checkbox:checked')).map(cb => cb.value);
+}
+
+// Применение действия
+function applyToSelected(operation) {
+  const ticketIds = getSelectedIds();
+  if (ticketIds.length === 0) {
+    alert('Выберите тикеты');
+    return;
+  }
+  
+  // Подтверждение для удаления
+  if (operation === 'hard_delete') {
+    new bootstrap.Modal(document.getElementById('deleteConfirmModal')).show();
+    return;
+  }
+  
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = '/tickets/bulk-operation';
+  
+  form.innerHTML = `
+    <input type="hidden" name="ticket_ids" value='${JSON.stringify(ticketIds)}'>
+    <input type="hidden" name="operation" value="${operation}">
+  `;
+  
+  document.body.appendChild(form);
+  form.submit();
+}
+
+// Подтверждение удаления
+function confirmHardDelete() {
+  const ticketIds = getSelectedIds();
+  
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = '/tickets/bulk-operation';
+  form.innerHTML = `
+    <input type="hidden" name="ticket_ids" value='${JSON.stringify(ticketIds)}'>
+    <input type="hidden" name="operation" value="hard_delete">
+  `;
+  
+  document.body.appendChild(form);
+  form.submit();
+}
+
+// Показать модальное окно назначения
+function showAssignModal() {
+  const ticketIds = getSelectedIds();
+  if (ticketIds.length === 0) {
+    alert('Выберите тикеты');
+    return;
+  }
+  new bootstrap.Modal(document.getElementById('assignModal')).show();
+}
+
+// Применить назначение
+function applyAssign() {
+  const ticketIds = getSelectedIds();
+  const ownerId = document.getElementById('assignOwner').value;
+  
+  if (!ownerId) {
+    alert('Выберите оператора');
+    return;
+  }
+  
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = '/tickets/bulk-operation';
+  form.innerHTML = `
+    <input type="hidden" name="ticket_ids" value='${JSON.stringify(ticketIds)}'>
+    <input type="hidden" name="operation" value="assign">
+    <input type="hidden" name="owner_id" value="${ownerId}">
+  `;
+  
+  document.body.appendChild(form);
+  form.submit();
+}
+
+// Показать модальное окно статуса
+function showStatusModal() {
+  const ticketIds = getSelectedIds();
+  if (ticketIds.length === 0) {
+    alert('Выберите тикеты');
+    return;
+  }
+  new bootstrap.Modal(document.getElementById('statusModal')).show();
+}
+
+// Применить статус
+function applyChangeStatus() {
+  const ticketIds = getSelectedIds();
+  const statusId = document.getElementById('changeStatus').value;
+  
+  if (!statusId) {
+    alert('Выберите статус');
+    return;
+  }
+  
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = '/tickets/bulk-operation';
+  form.innerHTML = `
+    <input type="hidden" name="ticket_ids" value='${JSON.stringify(ticketIds)}'>
+    <input type="hidden" name="operation" value="change_status">
+    <input type="hidden" name="status_id" value="${statusId}">
+  `;
+  
+  document.body.appendChild(form);
+  form.submit();
+}
+
+// Инициализация
+document.addEventListener('DOMContentLoaded', function() {
+  document.querySelectorAll('.ticket-checkbox').forEach(cb => {
+    cb.addEventListener('change', function() {
+      updateRowHighlight(this);
+      updateSelectedCount();
+    });
+  });
+});
+</script>
+{% endblock %}

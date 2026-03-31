@@ -9,10 +9,11 @@ from .message import Message
 from .attachment import Attachment
 from .ticket_event import TicketEvent
 from .audit_log import AuditLog
+from .ban import BannedEmail, BannedIP
 
 __all__ = [
     "Base", "engine", "SessionLocal", "get_db",
     "Department", "Agent", "Language", "TicketStatus",
     "QuestionCategory", "Ticket", "Message", "Attachment", "TicketEvent",
-    "AuditLog"
+    "AuditLog", "BannedEmail", "BannedIP"
 ]

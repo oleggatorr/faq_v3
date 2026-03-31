@@ -23,16 +23,15 @@ def _nl2br_filter(value: str) -> str:
 templates.env.filters["nl2br"] = _nl2br_filter
 
 
-def _get_unread_count(request: Request) -> int:
+def _get_unread_count(agent_id: int | None = None) -> int:
     """Получить количество непрочитанных сообщений для текущего агента."""
-    agent = getattr(request.state, 'agent', None)
-    if not agent:
+    if not agent_id:
         return 0
-    
+
     db = next(get_db())
     try:
         read_state_service = TicketReadStateService(db)
-        return read_state_service.get_total_unread_for_agent(agent_id=agent.id)
+        return read_state_service.get_total_unread_for_agent(agent_id=agent_id)
     except Exception:
         return 0
     finally:
@@ -54,9 +53,9 @@ def public_home(request: Request, agent: CurrentAgentOptional):
     """
     if agent:
         return RedirectResponse(url="/operator/home-page", status_code=303)
-    
+
     return templates.TemplateResponse(
-        "public_home.html",
+        "public/home.html",
         {"request": request, "agent": None},
     )
 

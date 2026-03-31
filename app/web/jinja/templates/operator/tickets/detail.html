@@ -1,0 +1,598 @@
+{# ===== ДЕТАЛЬНАЯ СТРАНИЦА ТИКЕТА (ОПЕРАТОР) ===== #}
+
+{% extends "base.html" %}
+
+{% block title %}Тикет {{ ticket.track_id }} — Система поддержки{% endblock %}
+
+{% block extra_css %}
+<style>
+  .ticket-detail-header {
+    background-color: #f9fafb;
+    border: 1px solid #e5e5e5;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+  
+  .ticket-info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+  }
+  
+  .info-item label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    color: #64748b;
+    font-weight: 600;
+    display: block;
+    margin-bottom: 0.25rem;
+  }
+  
+  .info-item value {
+    font-size: 0.9375rem;
+    color: #1e293b;
+  }
+  
+  .action-panel {
+    background-color: #ffffff;
+    border: 1px solid #e5e5e5;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+  }
+  
+  .control-card {
+    height: 100%;
+    border: 1px solid #e5e5e5;
+  }
+  
+  .control-card.success {
+    border-color: #16a34a;
+  }
+  
+  .control-card.success .card-header {
+    background-color: #16a34a;
+    color: white;
+  }
+  
+  .messages-thread {
+    background-color: #ffffff;
+    border: 1px solid #e5e5e5;
+  }
+  
+  .message-item {
+    padding: 1.5rem;
+    border-bottom: 1px solid #f3f4f6;
+  }
+  
+  .message-item:last-child {
+    border-bottom: none;
+  }
+  
+  .message-item.operator {
+    background-color: #f8fafc;
+    border-left: 3px solid #2563eb;
+  }
+  
+  .message-item.customer {
+    background-color: #ffffff;
+    border-left: 3px solid #22c55e;
+  }
+  
+  .message-item.internal {
+    background-color: #fef3c7;
+    border-left: 3px solid #ca8a04;
+  }
+  
+  .message-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+  }
+  
+  .events-timeline {
+    background-color: #f9fafb;
+    border: 1px solid #e5e5e5;
+    padding: 1rem;
+    margin-top: 1.5rem;
+    max-height: 400px;
+    overflow-y: auto;
+  }
+  
+  .event-item {
+    font-size: 0.875rem;
+    color: #64748b;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #e5e5e5;
+  }
+  
+  .event-item:last-child {
+    border-bottom: none;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="py-4">
+  <!-- Навигация -->
+  <div class="mb-4">
+    <a href="/tickets/my" class="btn btn-outline-secondary btn-sm">← Мои тикеты</a>
+    <a href="/tickets/all" class="btn btn-outline-secondary btn-sm ms-2">📂 Все тикеты</a>
+    <a href="/tickets/unassigned" class="btn btn-outline-secondary btn-sm ms-2">📥 Неназначенные</a>
+    <a href="/tickets/others" class="btn btn-outline-secondary btn-sm ms-2">👥 Чужие тикеты</a>
+  </div>
+
+  {% if error %}
+    <div class="alert alert-danger" role="alert">
+      {{ error }}
+    </div>
+  {% endif %}
+
+  {% if ticket %}
+  <!-- Заголовок тикета -->
+  <div class="ticket-detail-header">
+    <div class="d-flex justify-content-between align-items-start mb-3">
+      <div>
+        <h1 class="h3 mb-1">
+          📝 Тикет #{{ ticket.id }} <small class="text-muted">({{ ticket.track_id }})</small>
+        </h1>
+        <p class="text-muted mb-0">{{ ticket.subject }}</p>
+      </div>
+      <div class="text-end">
+        {% if ticket.is_archived %}
+          {% if can_edit_tickets %}
+          <form method="post" action="/tickets/{{ ticket.id }}/restore" class="d-inline">
+            <button type="submit" class="btn btn-sm btn-outline-success">♻️ Восстановить</button>
+          </form>
+          {% endif %}
+        {% else %}
+          <div class="btn-group" role="group">
+            {% if can_edit_tickets %}
+            <button type="button" class="btn btn-sm btn-outline-secondary"
+                    data-bs-toggle="modal" data-bs-target="#anonymizeModal"
+                    title="Анонимизировать тикет">
+              🔒 Анонимизировать
+            </button>
+            {% endif %}
+
+            {% if can_del_tickets %}
+            <form method="post" action="/tickets/{{ ticket.id }}/delete" class="d-inline"
+                  onsubmit="return confirm('⚠️ Вы уверены, что хотите отправить тикет в архив?');">
+              <button type="submit" class="btn btn-sm btn-outline-danger">
+                🗑️ В архив
+              </button>
+            </form>
+            {% endif %}
+
+            {% if can_hard_del_tickets %}
+            <button type="button" class="btn btn-sm btn-outline-danger"
+                    data-bs-toggle="modal" data-bs-target="#hardDeleteModal">
+              🔥 Удалить навсегда
+            </button>
+            {% endif %}
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Информация о тикете -->
+    <div class="ticket-info-grid">
+      <div class="info-item">
+        <label>Заявитель</label>
+        <value>{{ ticket.customer_name }}</value>
+        <br>
+        <a href="mailto:{{ ticket.customer_email }}">{{ ticket.customer_email }}</a>
+      </div>
+      
+      <div class="info-item">
+        <label>Исполнитель</label>
+        {% if ticket.owner_id %}
+          <span class="badge bg-info">👤 {{ agent_name_by_id.get(ticket.owner_id, 'Неизвестно') }}</span>
+        {% else %}
+          <span class="badge bg-warning text-dark">⚠️ Не назначен</span>
+        {% endif %}
+      </div>
+      
+      <div class="info-item">
+        <label>Статус</label>
+        <span class="badge {% if status_name_by_id.get(ticket.status_id, '') == 'Новый' %}bg-info{% elif status_name_by_id.get(ticket.status_id, '') == 'В работе' %}bg-warning{% elif status_name_by_id.get(ticket.status_id, '') == 'Закрыт' %}bg-success{% else %}bg-secondary{% endif %}">
+          {{ status_name_by_id.get(ticket.status_id, ticket.status_id) }}
+        </span>
+      </div>
+      
+      <div class="info-item">
+        <label>Приоритет</label>
+        <span class="badge {% if ticket.priority.value == 'high' %}bg-danger{% elif ticket.priority.value == 'normal' %}bg-info{% elif ticket.priority.value == 'urgent' %}bg-danger{% else %}bg-secondary{% endif %}">
+          {% if ticket.priority.value == 'low' %}
+            🔹 Низкий
+          {% elif ticket.priority.value == 'normal' %}
+            🔸 Обычный
+          {% elif ticket.priority.value == 'high' %}
+            🔴 Высокий
+          {% elif ticket.priority.value == 'urgent' %}
+            🔴🔴 Критический
+          {% endif %}
+        </span>
+      </div>
+      
+      <div class="info-item">
+        <label>Департамент</label>
+        <value>{{ ticket.department.name if ticket.department else '—' }}</value>
+      </div>
+      
+      <div class="info-item">
+        <label>Категория</label>
+        <value>{{ category_name_by_id.get(ticket.category_id, '—') }}</value>
+      </div>
+      
+      <div class="info-item">
+        <label>Создан</label>
+        <value>{{ ticket.created_at.strftime('%d.%m.%Y %H:%M') }}</value>
+      </div>
+      
+      <div class="info-item">
+        <label>Обновлён</label>
+        <value>{{ ticket.updated_at.strftime('%d.%m.%Y %H:%M') if ticket.updated_at else '—' }}</value>
+      </div>
+    </div>
+
+    {% if ticket.is_locked %}
+      <div class="alert alert-warning mt-3 mb-0">🔒 Тикет заблокирован</div>
+    {% endif %}
+    {% if ticket.is_archived %}
+      <div class="alert alert-secondary mt-3 mb-0">📦 Тикет в архиве</div>
+    {% endif %}
+  </div>
+
+  <!-- Панель управления тикетом (сразу после информации) -->
+  {% if can_edit_tickets %}
+  <div class="card mb-4">
+    <div class="card-header py-2">
+      <h6 class="mb-0">🎛️ Управление тикетом</h6>
+    </div>
+    <div class="card-body py-3">
+      <form method="post" action="/tickets/{{ ticket.id }}/update" class="row g-2 align-items-end">
+        <!-- Статус (требует can_edit_tickets) -->
+        {% if can_edit_tickets or agent.role == 'admin' %}
+        <div class="col-md-2">
+          <label class="form-label small mb-1">📊 Статус</label>
+          <select name="status_id" class="form-select form-select-sm">
+            {% for s in statuses %}
+              <option value="{{ s.id }}" {% if s.id == ticket.status_id %}selected{% endif %}>
+                {{ s.name }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+        {% else %}
+        <input type="hidden" name="status_id" value="{{ ticket.status_id }}" />
+        {% endif %}
+
+        <!-- Приоритет (требует can_edit_tickets) -->
+        {% if can_edit_tickets or agent.role == 'admin' %}
+        <div class="col-md-2">
+          <label class="form-label small mb-1">⚡ Приоритет</label>
+          <select name="priority" class="form-select form-select-sm">
+            {% for p in priorities %}
+              <option value="{{ p.value }}" {% if p.value == ticket.priority.value %}selected{% endif %}>
+                {{ p.value }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+        {% else %}
+        <input type="hidden" name="priority" value="{{ ticket.priority.value }}" />
+        {% endif %}
+
+        <!-- Категория (требует can_man_cat или админ) -->
+        {% if can_man_cat or agent.role == 'admin' %}
+        <div class="col-md-2">
+          <label class="form-label small mb-1">🏢 Категория</label>
+          <select name="category_id" class="form-select form-select-sm">
+            <option value="">— не менять —</option>
+            {% for c in categories|default([]) %}
+              <option value="{{ c.id }}" {% if c.id == ticket.category_id %}selected{% endif %}>
+                {{ c.name }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+        {% else %}
+        <input type="hidden" name="category_id" value="{{ ticket.category_id or '' }}" />
+        {% endif %}
+
+        <!-- Исполнитель (требует can_assign_tickets или админ) -->
+        {% if can_assign_tickets or agent.role == 'admin' %}
+        <div class="col-md-3">
+          <label class="form-label small mb-1">👤 Исполнитель</label>
+          <select name="owner_id" class="form-select form-select-sm">
+            <option value="0">— снять —</option>
+            {% for a in agents|default([]) %}
+              <option value="{{ a.id }}" {% if a.id == ticket.owner_id %}selected{% endif %}>
+                {{ a.full_name }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <!-- Кнопки -->
+        <div class="col-md-3">
+          <label class="form-label small mb-1">&nbsp;</label>
+          <div class="d-flex gap-2">
+            {% if ticket.owner_id != agent.id %}
+            <button type="submit" name="owner_id" value="{{ agent.id }}" class="btn btn-success btn-sm">
+              👈 Себе
+            </button>
+            {% endif %}
+            <button type="submit" class="btn btn-primary btn-sm">
+              💾 OK
+            </button>
+          </div>
+        </div>
+        {% else %}
+        <!-- Нет прав на назначение -- показываем только кнопку "Себе" если можно назначить -->
+        <div class="col-md-2">
+          <label class="form-label small mb-1">&nbsp;</label>
+          {% if ticket.owner_id != agent.id %}
+          <button type="submit" name="owner_id" value="{{ agent.id }}" class="btn btn-success btn-sm w-100">
+            👈 Себе
+          </button>
+          {% else %}
+          <span class="badge bg-success">✅ На вас</span>
+          {% endif %}
+        </div>
+        {% endif %}
+      </form>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Модальное окно анонимизации -->
+  {% if can_edit_tickets %}
+  <div class="modal fade" id="anonymizeModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header bg-warning text-dark">
+          <h1 class="modal-title fs-5">🔒 Анонимизация тикета</h1>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p class="mb-2">Вы действительно хотите анонимизировать тикет:</p>
+          <div class="alert alert-warning mb-0">
+            <strong>{{ ticket.track_id }}</strong><br>
+            <small>Тема: {{ ticket.subject }}</small>
+          </div>
+          <div class="alert alert-danger mt-3 mb-0">
+            <strong>⚠️ Внимание:</strong> Это действие скроет персональные данные:
+            <ul class="mb-0 mt-2">
+              <li>Имя клиента будет удалено</li>
+              <li>Email будет удалён</li>
+              <li>Все сообщения от клиента будут анонимизированы</li>
+              <li>Будущие сообщения не будут содержать имён</li>
+            </ul>
+            <p class="mt-2 mb-0"><small>IP-адреса и история изменений сохранятся для аудита.</small></p>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">❌ Отмена</button>
+          <form method="post" action="/tickets/{{ ticket.id }}/anonymize" class="d-inline">
+            <button type="submit" class="btn btn-warning">🔒 Анонимизировать</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+  
+  <!-- Модальное окно полного удаления -->
+  {% if can_hard_del_tickets %}
+  <div class="modal fade" id="hardDeleteModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header bg-danger text-white">
+          <h1 class="modal-title fs-5">⚠️ Полное удаление тикета</h1>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p class="mb-2">Вы действительно хотите полностью удалить тикет:</p>
+          <div class="alert alert-warning mb-0">
+            <strong>{{ ticket.track_id }}</strong><br>
+            <small>Тема: {{ ticket.subject }}</small>
+          </div>
+          <div class="alert alert-danger mt-3 mb-0">
+            <strong>⚠️ Внимание:</strong> Это действие необратимо! Будут удалены:
+            <ul class="mb-0 mt-2">
+              <li>Все сообщения</li>
+              <li>История изменений</li>
+              <li>Сам тикет</li>
+            </ul>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">❌ Отмена</button>
+          <form method="post" action="/tickets/{{ ticket.id }}/hard-delete" class="d-inline">
+            <button type="submit" class="btn btn-danger">🔥 Удалить навсегда</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Форма: Ответ клиенту -->
+  {% if can_reply_tickets %}
+  <div class="card mb-3">
+    <div class="card-header">
+      <h5 class="mb-0">✉️ Ответ клиенту</h5>
+    </div>
+    <div class="card-body">
+      <form method="post" action="/tickets/{{ ticket.id }}/reply" enctype="multipart/form-data">
+        <div class="mb-3">
+          <label for="reply_body" class="form-label">Текст ответа</label>
+          <textarea 
+            class="form-control" 
+            id="reply_body"
+            name="body" 
+            rows="5" 
+            required 
+            placeholder="Введите ответ для клиента..."
+          ></textarea>
+        </div>
+        <div class="mb-3">
+          <label for="reply_attachments" class="form-label">Вложения</label>
+          <input 
+            type="file" 
+            class="form-control" 
+            id="reply_attachments"
+            name="attachments" 
+            multiple 
+          />
+        </div>
+        <button type="submit" class="btn btn-primary">
+          📤 Отправить клиенту
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Форма: Внутренняя заметка -->
+  <div class="card mb-3">
+    <div class="card-header">
+      <h5 class="mb-0">
+        📝 Внутренняя заметка 
+        <small class="text-muted">(не видна клиенту)</small>
+      </h5>
+    </div>
+    <div class="card-body">
+      <form method="post" action="/tickets/{{ ticket.id }}/reply" enctype="multipart/form-data">
+        <input type="hidden" name="is_internal" value="true" />
+        <div class="mb-3">
+          <label for="internal_body" class="form-label">Текст заметки</label>
+          <textarea 
+            class="form-control bg-light" 
+            id="internal_body"
+            name="body" 
+            rows="4" 
+            required 
+            placeholder="Внутренняя заметка для операторов..."
+          ></textarea>
+        </div>
+        <div class="mb-3">
+          <label for="internal_attachments" class="form-label">Вложения</label>
+          <input 
+            type="file" 
+            class="form-control" 
+            id="internal_attachments"
+            name="attachments" 
+            multiple 
+          />
+        </div>
+        <button type="submit" class="btn btn-secondary">
+          📝 Добавить заметку
+        </button>
+      </form>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Панель управления тикетом -->
+  
+
+  <!-- Переписка -->
+  <div class="card mb-4">
+    <div class="card-header">
+      <h5 class="mb-0">💬 Переписка</h5>
+    </div>
+    <div class="card-body p-0">
+      {% if messages %}
+        <div class="message-thread">
+          {% for msg in messages %}
+          <div class="message-item {% if msg.is_internal %}internal{% elif msg.agent_id %}operator{% else %}customer{% endif %}">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <div>
+                {% if msg.is_internal %}
+                  <span class="badge bg-warning text-dark">🔐 Внутренняя заметка</span>
+                {% elif msg.agent_id %}
+                  <span class="badge bg-info">👤 {{ agent_name_by_id.get(msg.agent_id, msg.sender_name|default('Агент', true)) }}</span>
+                {% else %}
+                  <span class="badge bg-success">👤 {{ msg.sender_name|default('Клиент', true) }}</span>
+                {% endif %}
+              </div>
+              <div class="d-flex align-items-center gap-2">
+                <small class="text-muted">
+                  {{ msg.created_at.strftime('%d.%m.%Y %H:%M') }}
+                </small>
+                {% if can_edit_tickets and not msg.is_internal and msg.customer_email %}
+                  <form method="POST" action="/messages/{{ msg.id }}/anonymize" class="d-inline"
+                        onsubmit="return confirm('⚠️ Вы уверены, что хотите анонимизировать сообщение?\n\nБудут удалены:\n- Имя отправителя\n- Email\n\nIP-адрес будет сохранён для аудита.');">
+                    <button type="submit" class="btn btn-sm btn-outline-secondary" title="Анонимизировать">
+                      🔒
+                    </button>
+                  </form>
+                {% endif %}
+              </div>
+            </div>
+            <div class="message-body" style="white-space: pre-wrap;">{{ msg.body }}</div>
+
+            {% set msg_attachments = attachments_by_message.get(msg.id, []) %}
+            {% if msg_attachments %}
+              <div class="attachments mt-3 pt-3 border-top">
+                <strong class="small">📎 Вложения:</strong>
+                <ul class="mb-0 small mt-1">
+                  {% for att in msg_attachments %}
+                    <li>
+                      <a href="/attachments/{{ att.id }}/download"
+                         {% if att.mime_type.startswith('image/') or att.mime_type == 'application/pdf' %}target="_blank"{% else %}download{% endif %}>
+                        {% if att.mime_type.startswith('image/') %}
+                          🖼️
+                        {% elif att.mime_type == 'application/pdf' %}
+                          📄
+                        {% else %}
+                          📎
+                        {% endif %}
+                        {{ att.original_filename }}
+                      </a>
+                      <span class="text-muted">({{ (att.file_size / 1024)|round(1) }} КБ)</span>
+                    </li>
+                  {% endfor %}
+                </ul>
+              </div>
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="text-muted text-center py-4 mb-0">Сообщений пока нет.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- История изменений -->
+  <div class="events-timeline">
+    <h6 class="mb-3">📜 История изменений</h6>
+    {% if events %}
+      {% for ev in events %}
+      <div class="event-item">
+        <small class="text-muted">{{ ev.occurred_at.strftime('%d.%m.%Y %H:%M:%S') }}</small>
+        <strong>{{ ev.action_type }}</strong>
+        {% if ev.comment %}
+          <em class="text-muted">— {{ ev.comment }}</em>
+        {% endif %}
+        {% if ev.field_name and ev.old_value != ev.new_value %}
+          <br>
+          <small class="text-muted">
+            {{ ev.field_name }}:
+            <del>{{ ev.old_value }}</del> → <ins class="text-success">{{ ev.new_value }}</ins>
+          </small>
+        {% endif %}
+      </div>
+      {% endfor %}
+    {% else %}
+      <p class="text-muted mb-0">Событий нет.</p>
+    {% endif %}
+  </div>
+
+  {% endif %}
+</div>
+{% endblock %}

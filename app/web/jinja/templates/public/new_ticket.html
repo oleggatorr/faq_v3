@@ -1,0 +1,217 @@
+{# ===== СОЗДАНИЕ ЗАЯВКИ (ПУБЛИЧНАЯ) ===== #}
+
+{% extends "base.html" %}
+
+{% block title %}Создать заявку — Система поддержки{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* Стили для страницы создания заявки */
+  .form-section {
+    background-color: #ffffff;
+    border: 1px solid #e5e5e5;
+    border-radius: 0;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    padding: 2rem;
+    margin-bottom: 1.5rem;
+  }
+  
+  .form-section-title {
+    color: #1e293b;
+    font-weight: 600;
+    font-size: 1.125rem;
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 2px solid #e5e5e5;
+  }
+  
+  .form-control, .form-select {
+    border-radius: 0 !important;
+  }
+  
+  .btn-submit {
+    min-width: 200px;
+    padding: 0.75rem 2rem;
+    font-size: 1rem;
+    font-weight: 500;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="py-4">
+  <!-- Заголовок -->
+  <div class="text-center mb-4">
+    <h1 class="h3 mb-2" style="color: #1e293b; font-weight: 600;">
+      📝 Создание заявки
+    </h1>
+    <p class="text-muted small">
+      Заполните форму для создания обращения в службу поддержки
+    </p>
+  </div>
+
+  <!-- Сообщение об ошибке -->
+  {% if error %}
+    <div class="alert alert-danger mb-4" role="alert">
+      <strong>✕</strong> {{ error }}
+    </div>
+  {% endif %}
+
+  <form method="post" action="/new-ticket" enctype="multipart/form-data">
+    <div class="row justify-content-center">
+      <div class="col-lg-8">
+        
+        <!-- Раздел 1: Контактные данные -->
+        <div class="form-section">
+          <h2 class="form-section-title">👤 Контактные данные</h2>
+          
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label for="customer_name" class="form-label">Ваше имя <span class="text-danger">*</span></label>
+              <input
+                type="text"
+                class="form-control"
+                id="customer_name"
+                name="customer_name"
+                value="{{ form_data.customer_name or '' }}"
+                required
+                maxlength="200"
+                placeholder="Иванов Иван"
+              />
+            </div>
+
+            <div class="col-md-6">
+              <label for="customer_email" class="form-label">Email <span class="text-danger">*</span></label>
+              <input
+                type="email"
+                class="form-control"
+                id="customer_email"
+                name="customer_email"
+                value="{{ form_data.customer_email or '' }}"
+                required
+                maxlength="255"
+                placeholder="ivan@example.com"
+              />
+            </div>
+          </div>
+        </div>
+
+        <!-- Раздел 2: Информация об обращении -->
+        <div class="form-section">
+          <h2 class="form-section-title">📋 Информация об обращении</h2>
+          
+          <div class="row g-3">
+            <div class="col-md-8">
+              <label for="subject" class="form-label">Тема <span class="text-danger">*</span></label>
+              <input
+                type="text"
+                class="form-control"
+                id="subject"
+                name="subject"
+                value="{{ form_data.subject or '' }}"
+                required
+                maxlength="255"
+                placeholder="Краткое описание проблемы"
+              />
+            </div>
+
+            <div class="col-md-4">
+              <label for="department_id" class="form-label">Департамент <span class="text-danger">*</span></label>
+              <select name="department_id" id="department_id" class="form-select" required>
+                <option value="">— Выберите —</option>
+                {% for d in departments %}
+                  <option value="{{ d.id }}" {% if form_data.department_id == d.id %}selected{% endif %}>
+                    {{ d.name }}
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="col-md-6">
+              <label for="category_id" class="form-label">Категория</label>
+              <select name="category_id" id="category_id" class="form-select">
+                <option value="">— Не указана —</option>
+                {% for c in categories %}
+                  <option value="{{ c.id }}" {% if form_data.category_id == c.id %}selected{% endif %}>
+                    {{ c.name }}
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="col-md-6">
+              <label for="priority" class="form-label">Приоритет</label>
+              <select name="priority" id="priority" class="form-select">
+                {% for p in priorities %}
+                  <option value="{{ p.value }}" {% if form_data.priority == p.value %}selected{% endif %}>
+                    {% if p.value == 'low' %}
+                      🔹 Низкий
+                    {% elif p.value == 'normal' %}
+                      🔸 Обычный
+                    {% elif p.value == 'high' %}
+                      🔴 Высокий
+                    {% elif p.value == 'urgent' %}
+                      🔴🔴 Критический
+                    {% endif %}
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Раздел 3: Сообщение -->
+        <div class="form-section">
+          <h2 class="form-section-title">💬 Сообщение</h2>
+          
+          <div class="mb-3">
+            <label for="body" class="form-label">Текст обращения <span class="text-danger">*</span></label>
+            <textarea
+              class="form-control"
+              id="body"
+              name="body"
+              rows="10"
+              required
+              placeholder="Подробно опишите вашу проблему..."
+            >{{ form_data.body or '' }}</textarea>
+            <small class="text-muted">
+              Опишите проблему максимально подробно — это поможет нам быстрее вам помочь
+            </small>
+          </div>
+        </div>
+
+        <!-- Раздел 4: Вложения -->
+        <div class="form-section">
+          <h2 class="form-section-title">📎 Вложения</h2>
+          
+          <div class="mb-3">
+            <label for="attachments" class="form-label">Прикрепить файлы</label>
+            <input
+              type="file"
+              class="form-control"
+              id="attachments"
+              name="attachments"
+              multiple
+            />
+            <small class="text-muted d-block mt-1">
+              Можно прикрепить несколько файлов. Максимальный размер: 10 МБ каждый.
+            </small>
+          </div>
+        </div>
+
+        <!-- Кнопки -->
+        <div class="text-center mt-4">
+          <button type="submit" class="btn btn-primary btn-submit">
+            📤 Отправить обращение
+          </button>
+          <br>
+          <a href="/" class="btn btn-outline-secondary btn-sm mt-2">
+            ← На главную
+          </a>
+        </div>
+
+      </div>
+    </div>
+  </form>
+</div>
+{% endblock %}

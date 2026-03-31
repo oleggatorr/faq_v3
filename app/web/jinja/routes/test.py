@@ -2,13 +2,29 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
-from app.core.auth import CurrentAgent
+from app.core.auth import CurrentAgent, CurrentAgentOptional
 from app.models import get_db
 from app.services.ticket.read_state_service import TicketReadStateService
 
 from .main import templates
 
 router = APIRouter(prefix="/test", tags=["test"])
+
+
+@router.get("/", response_class=HTMLResponse)
+def test_base(request: Request, agent: CurrentAgentOptional):
+    """
+    Тестовая страница для проверки base.html.
+    
+    Показывает работу базового шаблона с header, footer и flash-сообщениями.
+    """
+    return templates.TemplateResponse(
+        "test/base.html",
+        {
+            "request": request,
+            "agent": agent,
+        },
+    )
 
 
 @router.get("/unread", response_class=HTMLResponse)
@@ -19,13 +35,13 @@ def test_unread_messages(
 ):
     """
     Тестовая страница для проверки количества непрочитанных сообщений.
-    
+
     Показывает:
     - Общее количество непрочитанных сообщений
     - Список тикетов с непрочитанными сообщениями
     """
     print(f"\n=== [DEBUG] /test/unread: agent_id={agent.id}, agent_login={agent.login}")
-    
+
     read_state_service = TicketReadStateService(db)
 
     # Получаем общее количество непрочитанных
@@ -62,7 +78,7 @@ def test_assignment(
 ):
     """
     Тестовая страница для проверки автоназначения операторов.
-    
+
     Показывает список операторов, доступных для назначения на тикет.
     """
     return templates.TemplateResponse(

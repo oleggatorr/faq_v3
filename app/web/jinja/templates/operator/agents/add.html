@@ -1,0 +1,245 @@
+{# ===== ДОБАВЛЕНИЕ АГЕНТА (ОПЕРАТОР) ===== #}
+
+{% extends "base.html" %}
+
+{% block title %}➕ Добавить оператора — Система поддержки{% endblock %}
+
+{% block extra_css %}
+<style>
+  .page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 1rem !important;
+    margin-bottom: 1.5rem !important;
+    border-bottom: 2px solid #e5e5e5 !important;
+  }
+  
+  .page-header h1 {
+    color: #1e293b !important;
+    font-weight: 600 !important;
+    font-size: 1.5rem !important;
+    margin-bottom: 0 !important;
+  }
+  
+  .tips-card {
+    background-color: #f9fafb;
+    border: 1px solid #e5e5e5;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="py-4">
+  <!-- Заголовок -->
+  <div class="page-header">
+    <h1 class="mb-0">➕ Добавить оператора</h1>
+    <a href="/agents" class="btn btn-outline-secondary btn-sm">← Назад</a>
+  </div>
+
+  {% if error %}
+    <div class="alert alert-danger" role="alert">
+      {{ error }}
+    </div>
+  {% endif %}
+
+  <div class="row">
+    <!-- Форма -->
+    <div class="col-lg-8">
+      <div class="card mb-4">
+        <div class="card-body p-4">
+          <form method="post" novalidate>
+            <!-- Основная информация -->
+            <h5 class="mb-3">📋 Основная информация</h5>
+            
+            <div class="row g-3 mb-4">
+              <div class="col-md-6">
+                <label for="full_name" class="form-label small">ФИО *</label>
+                <input type="text" class="form-control form-control-sm" id="full_name" name="full_name" required value="{{ form_data.full_name if form_data else '' }}" placeholder="Иванов Иван Иванович" />
+              </div>
+              
+              <div class="col-md-6">
+                <label for="login" class="form-label small">Логин *</label>
+                <input type="text" class="form-control form-control-sm" id="login" name="login" required value="{{ form_data.login if form_data else '' }}" placeholder="ivanov" />
+              </div>
+              
+              <div class="col-md-6">
+                <label for="email" class="form-label small">Email *</label>
+                <input type="email" class="form-control form-control-sm" id="email" name="email" required value="{{ form_data.email if form_data else '' }}" placeholder="ivanov@company.com" />
+              </div>
+              
+              <div class="col-md-6">
+                <label for="phone" class="form-label small">Телефон</label>
+                <input type="text" class="form-control form-control-sm" id="phone" name="phone" value="{{ form_data.phone if form_data else '' }}" placeholder="+7 (999) 123-45-67" />
+              </div>
+            </div>
+
+            <!-- Безопасность -->
+            <h5 class="mb-3">🔐 Безопасность</h5>
+            
+            <div class="row g-3 mb-4">
+              <div class="col-md-6">
+                <label for="password" class="form-label small">Пароль *</label>
+                <input type="password" class="form-control form-control-sm" id="password" name="password" required autocomplete="new-password" />
+              </div>
+              
+              <div class="col-md-6">
+                <label for="password_confirm" class="form-label small">Подтверждение *</label>
+                <input type="password" class="form-control form-control-sm" id="password_confirm" name="password_confirm" required autocomplete="new-password" />
+              </div>
+            </div>
+
+            <!-- Должность -->
+            <h5 class="mb-3">👔 Должность</h5>
+            
+            <div class="row g-3 mb-4">
+              <div class="col-md-6">
+                <label for="role" class="form-label small">Роль *</label>
+                <select name="role" id="role" class="form-select form-select-sm" onchange="toggleFields()">
+                  <option value="operator" selected>Оператор</option>
+                  <option value="admin">Администратор</option>
+                </select>
+              </div>
+              
+              <div class="col-md-6">
+                <label for="department_id" class="form-label small">Департамент *</label>
+                <select name="department_id" id="department_id" class="form-select form-select-sm">
+                  {% for d in departments %}
+                    <option value="{{ d.id }}" {% if form_data and form_data.department_id == d.id %}selected{% endif %}>{{ d.name }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
+
+            <!-- Статус и настройки -->
+            <div class="row g-3 mb-4">
+              <div class="col-md-6">
+                <div class="form-check form-switch">
+                  <input class="form-check-input" type="checkbox" name="is_active" id="is_active" checked />
+                  <label class="form-check-label small" for="is_active"><strong>Активен</strong></label>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="form-check form-switch">
+                  <input class="form-check-input" type="checkbox" name="auto_assign" id="auto_assign" checked />
+                  <label class="form-check-label small" for="auto_assign"><strong>📬 Автоназначение</strong></label>
+                </div>
+              </div>
+            </div>
+
+            <div class="mb-4">
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" name="email_notifications" id="email_notifications" checked />
+                <label class="form-check-label small" for="email_notifications"><strong>📧 Email-уведомления</strong></label>
+              </div>
+            </div>
+
+            <!-- Категории (только для операторов) -->
+            <div id="category_block" class="mb-4">
+              <h5 class="mb-3">📁 Доступ к категориям</h5>
+              <div class="card bg-light">
+                <div class="card-body p-3">
+                  <div class="row g-2">
+                    {% for cat in categories %}
+                      <div class="col-md-4 col-sm-6">
+                        <div class="form-check">
+                          <input class="form-check-input" type="checkbox" name="category_access" value="{{ cat.id }}" id="cat_{{ cat.id }}" {% if form_data and cat.id|string in form_data.category_access %}checked{% endif %} />
+                          <label class="form-check-label small" for="cat_{{ cat.id }}">{{ cat.name }}</label>
+                        </div>
+                      </div>
+                    {% endfor %}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Права (только для операторов) -->
+            <div id="permissions_block" class="mb-4">
+              <h5 class="mb-3">🔑 Права доступа</h5>
+              <div class="card bg-light">
+                <div class="card-body p-3">
+                  {% for group_name, perms in permission_groups.items() %}
+                    <h6 class="text-primary mb-2 mt-2 small">{{ group_name }}</h6>
+                    <div class="row g-2 mb-2">
+                      {% for p in perms %}
+                        <div class="col-md-4 col-sm-6">
+                          <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="permissions" value="{{ p.value }}" id="perm_{{ p.value }}" {% if form_data and p.value in form_data.permissions %}checked{% endif %} />
+                            <label class="form-check-label small" for="perm_{{ p.value }}">{{ permission_labels.get(p.value, p.value) }}</label>
+                          </div>
+                        </div>
+                      {% endfor %}
+                    </div>
+                  {% endfor %}
+                </div>
+              </div>
+            </div>
+
+            <!-- Кнопки -->
+            <div class="d-flex gap-2">
+              <button type="submit" class="btn btn-primary btn-sm">✓ Создать</button>
+              <a href="/agents" class="btn btn-outline-secondary btn-sm">Отмена</a>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Подсказки -->
+    <div class="col-lg-4">
+      <div class="card tips-card">
+        <div class="card-header py-2">
+          <h6 class="mb-0">ℹ️ Подсказки</h6>
+        </div>
+        <div class="card-body p-3">
+          <dl class="mb-0 small">
+            <dt class="text-muted">Роль</dt>
+            <dd class="mb-2">
+              <strong>Оператор</strong> — работает с тикетами<br>
+              <strong>Администратор</strong> — полный доступ
+            </dd>
+            
+            <dt class="text-muted">Категории</dt>
+            <dd class="mb-2">Категории вопросов, к которым будет доступ</dd>
+            
+            <dt class="text-muted">Права</dt>
+            <dd>Детальные права для тонкой настройки</dd>
+          </dl>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function toggleFields() {
+  const role = document.getElementById("role").value;
+  const category = document.getElementById("category_block");
+  const permissions = document.getElementById("permissions_block");
+
+  if (role === "admin") {
+    category.style.display = "none";
+    permissions.style.display = "none";
+  } else {
+    category.style.display = "block";
+    permissions.style.display = "block";
+  }
+}
+
+function validatePasswords() {
+  const password = document.getElementById("password").value;
+  const passwordConfirm = document.getElementById("password_confirm").value;
+
+  if (password !== passwordConfirm) {
+    alert("❌ Пароли не совпадают!");
+    return false;
+  }
+  return true;
+}
+
+document.addEventListener('DOMContentLoaded', toggleFields);
+document.querySelector("form").onsubmit = validatePasswords;
+</script>
+{% endblock %}

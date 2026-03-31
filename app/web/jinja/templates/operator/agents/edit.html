@@ -1,0 +1,311 @@
+{# ===== РЕДАКТИРОВАНИЕ АГЕНТА (ОПЕРАТОР) ===== #}
+
+{% extends "base.html" %}
+
+{% block title %}✏️ {{ target_agent.full_name }} — Система поддержки{% endblock %}
+
+{% block extra_css %}
+<style>
+  .page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 1rem !important;
+    margin-bottom: 1.5rem !important;
+    border-bottom: 2px solid #e5e5e5 !important;
+  }
+  
+  .page-header h1 {
+    color: #1e293b !important;
+    font-weight: 600 !important;
+    font-size: 1.5rem !important;
+    margin-bottom: 0 !important;
+  }
+  
+  .info-panel {
+    background-color: #f9fafb;
+    border: 1px solid #e5e5e5;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+  }
+  
+  .danger-zone {
+    border: 1px solid #dc2626 !important;
+  }
+  
+  .danger-zone .card-header {
+    background-color: #dc2626 !important;
+    color: white !important;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="py-4">
+  <!-- Заголовок -->
+  <div class="page-header">
+    <h1 class="mb-0">✏️ Редактировать оператора</h1>
+    <a href="/agents" class="btn btn-outline-secondary btn-sm">← Назад</a>
+  </div>
+
+  {% if error %}
+    <div class="alert alert-danger" role="alert">
+      {{ error }}
+    </div>
+  {% endif %}
+
+  <div class="row">
+    <!-- Форма -->
+    <div class="col-lg-8">
+      <div class="card mb-4">
+        <div class="card-body p-4">
+          <form method="post" novalidate>
+            <!-- Основная информация -->
+            <h5 class="mb-3">📋 Основная информация</h5>
+            
+            <div class="row g-3 mb-4">
+              <div class="col-md-6">
+                <label for="full_name" class="form-label small">ФИО *</label>
+                <input type="text" class="form-control form-control-sm" id="full_name" name="full_name" required value="{{ target_agent.full_name }}" />
+              </div>
+              
+              <div class="col-md-6">
+                <label for="login" class="form-label small">Логин *</label>
+                <input type="text" class="form-control form-control-sm" id="login" name="login" required value="{{ target_agent.login }}" />
+              </div>
+              
+              <div class="col-md-6">
+                <label for="email" class="form-label small">Email *</label>
+                <input type="email" class="form-control form-control-sm" id="email" name="email" required value="{{ target_agent.email }}" />
+              </div>
+              
+              <div class="col-md-6">
+                <label for="phone" class="form-label small">Телефон</label>
+                <input type="text" class="form-control form-control-sm" id="phone" name="phone" value="{{ target_agent.phone or '' }}" />
+              </div>
+            </div>
+
+            <!-- Смена пароля -->
+            <h5 class="mb-3">🔐 Смена пароля</h5>
+            <p class="text-muted small mb-3">Оставьте поля пустыми, если не хотите менять пароль</p>
+            
+            <div class="row g-3 mb-4">
+              <div class="col-md-6">
+                <label for="password" class="form-label small">Новый пароль</label>
+                <input type="password" class="form-control form-control-sm" id="password" name="password" autocomplete="new-password" />
+              </div>
+              
+              <div class="col-md-6">
+                <label for="password_confirm" class="form-label small">Подтверждение</label>
+                <input type="password" class="form-control form-control-sm" id="password_confirm" name="password_confirm" autocomplete="new-password" />
+              </div>
+            </div>
+
+            <!-- Роль и департамент -->
+            <h5 class="mb-3">👔 Должность</h5>
+            
+            <div class="row g-3 mb-4">
+              <div class="col-md-6">
+                <label for="role" class="form-label small">Роль *</label>
+                <select name="role" id="role" class="form-select form-select-sm" onchange="toggleFields()">
+                  <option value="operator" {% if target_agent.role == 'operator' %}selected{% endif %}>Оператор</option>
+                  <option value="admin" {% if target_agent.role == 'admin' %}selected{% endif %}>Администратор</option>
+                </select>
+              </div>
+              
+              <div class="col-md-6">
+                <label for="department_id" class="form-label small">Департамент *</label>
+                <select name="department_id" id="department_id" class="form-select form-select-sm">
+                  {% for d in departments %}
+                    <option value="{{ d.id }}" {% if d.id == target_agent.department_id %}selected{% endif %}>{{ d.name }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
+
+            <!-- Статус и настройки -->
+            <div class="row g-3 mb-4">
+              <div class="col-md-6">
+                <div class="form-check form-switch">
+                  <input class="form-check-input" type="checkbox" name="is_active" id="is_active" {% if target_agent.is_active %}checked{% endif %} />
+                  <label class="form-check-label small" for="is_active"><strong>Активен</strong></label>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="form-check form-switch">
+                  <input class="form-check-input" type="checkbox" name="auto_assign" id="auto_assign" {% if target_agent.auto_assign %}checked{% endif %} />
+                  <label class="form-check-label small" for="auto_assign"><strong>📬 Автоназначение</strong></label>
+                </div>
+              </div>
+            </div>
+
+            <div class="mb-4">
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" name="email_notifications" id="email_notifications" {% if target_agent.email_notifications %}checked{% endif %} />
+                <label class="form-check-label small" for="email_notifications"><strong>📧 Email-уведомления</strong></label>
+              </div>
+            </div>
+
+            <!-- Категории (только для операторов) -->
+            <div id="category_block" class="mb-4">
+              <h5 class="mb-3">📁 Доступ к категориям</h5>
+              <div class="card bg-light">
+                <div class="card-body p-3">
+                  <div class="row g-2">
+                    {% for cat in categories %}
+                      <div class="col-md-4 col-sm-6">
+                        <div class="form-check">
+                          <input class="form-check-input" type="checkbox" name="category_access" value="{{ cat.id }}" id="cat_{{ cat.id }}" {% if cat.id|string in selected_categories %}checked{% endif %} />
+                          <label class="form-check-label small" for="cat_{{ cat.id }}">{{ cat.name }}</label>
+                        </div>
+                      </div>
+                    {% endfor %}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Права (только для операторов) -->
+            <div id="permissions_block" class="mb-4">
+              <h5 class="mb-3">🔑 Права доступа</h5>
+              <div class="card bg-light">
+                <div class="card-body p-3">
+                  {% for group_name, perms in permission_groups.items() %}
+                    <h6 class="text-primary mb-2 mt-2 small">{{ group_name }}</h6>
+                    <div class="row g-2 mb-2">
+                      {% for p in perms %}
+                        <div class="col-md-4 col-sm-6">
+                          <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="permissions" value="{{ p.value }}" id="perm_{{ p.value }}" {% if p.value in selected_permissions %}checked{% endif %} />
+                            <label class="form-check-label small" for="perm_{{ p.value }}">{{ permission_labels.get(p.value, p.value) }}</label>
+                          </div>
+                        </div>
+                      {% endfor %}
+                    </div>
+                  {% endfor %}
+                </div>
+              </div>
+            </div>
+
+            <!-- Кнопки -->
+            <div class="d-flex gap-2">
+              <button type="submit" class="btn btn-primary btn-sm">💾 Сохранить</button>
+              <a href="/agents" class="btn btn-outline-secondary btn-sm">Отмена</a>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Инфо-панель -->
+    <div class="col-lg-4">
+      <div class="card mb-3">
+        <div class="card-header py-2">
+          <h6 class="mb-0">ℹ️ Информация</h6>
+        </div>
+        <div class="card-body p-3">
+          <dl class="mb-0 small">
+            <dt class="text-muted">ID агента</dt>
+            <dd class="mb-2">{{ target_agent.id }}</dd>
+            
+            <dt class="text-muted">Последний вход</dt>
+            <dd class="mb-2">
+              {% if target_agent.last_login_at %}
+                {{ target_agent.last_login_at.strftime('%d.%m.%Y %H:%M') }}
+              {% else %}
+                <span class="text-muted">—</span>
+              {% endif %}
+            </dd>
+            
+            <dt class="text-muted">Создан</dt>
+            <dd>
+              {% if target_agent.created_at %}
+                {{ target_agent.created_at.strftime('%d.%m.%Y') }}
+              {% endif %}
+            </dd>
+          </dl>
+        </div>
+      </div>
+
+      <div class="card danger-zone">
+        <div class="card-header py-2">
+          <h6 class="mb-0">⚠️ Опасная зона</h6>
+        </div>
+        <div class="card-body p-3">
+          <p class="small text-muted mb-2">Удаление агента необратимо.</p>
+          {% if agent_delete and target_agent.id != agent.id %}
+            <button type="button" class="btn btn-outline-danger btn-sm w-100" data-bs-toggle="modal" data-bs-target="#deleteAgentModal">🗑️ Удалить</button>
+          {% else %}
+            <button class="btn btn-outline-danger btn-sm w-100" disabled title="{% if target_agent.id == agent.id %}Нельзя удалить себя{% else %}Нет прав{% endif %}">🗑️ Удалить</button>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Модальное окно удаления -->
+{% if agent_delete and target_agent.id != agent.id %}
+<div class="modal fade" id="deleteAgentModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-danger text-white">
+        <h6 class="modal-title fs-6">⚠️ Удаление оператора</h6>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-2 small"><strong>Вы действительно хотите удалить оператора?</strong></p>
+        <div class="alert alert-warning mb-0 small">
+          <strong>{{ target_agent.full_name }}</strong><br>
+          Логин: {{ target_agent.login }} | Email: {{ target_agent.email }}
+        </div>
+        <p class="text-danger small mt-2 mb-0">⚠️ Это действие необратимо!</p>
+      </div>
+      <div class="modal-footer py-2">
+        <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Отмена</button>
+        <form method="post" action="/agents/{{ target_agent.id }}/delete" class="d-inline">
+          <button type="submit" class="btn btn-sm btn-danger">Удалить</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function toggleFields() {
+  const role = document.getElementById("role").value;
+  const category = document.getElementById("category_block");
+  const permissions = document.getElementById("permissions_block");
+
+  if (role === "admin") {
+    category.style.display = "none";
+    permissions.style.display = "none";
+  } else {
+    category.style.display = "block";
+    permissions.style.display = "block";
+  }
+}
+
+function validatePasswords() {
+  const password = document.getElementById("password").value;
+  const passwordConfirm = document.getElementById("password_confirm").value;
+
+  if (!password && !passwordConfirm) return true;
+  if (!password || !passwordConfirm) {
+    alert("⚠️ Заполните оба поля пароля или оставьте оба пустыми!");
+    return false;
+  }
+  if (password !== passwordConfirm) {
+    alert("❌ Пароли не совпадают!");
+    return false;
+  }
+  return true;
+}
+
+document.addEventListener('DOMContentLoaded', toggleFields);
+document.querySelector("form").onsubmit = validatePasswords;
+</script>
+{% endblock %}

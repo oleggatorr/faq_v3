@@ -34,7 +34,7 @@ def departments_list(
         offset=offset,
     )
     return templates.TemplateResponse(
-        "departments/list.html",
+        "operator/departments/list.html",
         {"request": request, "departments": departments, "agent": agent},
     )
 

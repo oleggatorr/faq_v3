@@ -1,0 +1,88 @@
+{# ===== ГЛАВНАЯ СТРАНИЦА (ПУБЛИЧНАЯ) ===== #}
+
+{% extends "base.html" %}
+
+{% block title %}Главная — Система поддержки{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* Дополнительные стили для главной страницы */
+  .hero-section {
+    min-height: 60vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 3rem 0;
+  }
+  
+  .action-btn {
+    min-width: 280px;
+    padding: 1.25rem 2rem;
+    font-size: 1.1rem;
+    font-weight: 500;
+    margin: 0.75rem 0;
+    transition: all 0.2s ease;
+  }
+  
+  .action-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  }
+  
+  .btn-create {
+    background-color: #2563eb;
+    border-color: #2563eb;
+    color: white;
+  }
+  
+  .btn-create:hover {
+    background-color: #1d4ed8;
+    border-color: #1d4ed8;
+    color: white;
+  }
+  
+  .btn-track {
+    background-color: #ffffff;
+    border: 2px solid #2563eb;
+    color: #2563eb;
+  }
+  
+  .btn-track:hover {
+    background-color: #2563eb;
+    border-color: #2563eb;
+    color: white;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="hero-section">
+  <!-- Заголовок -->
+  <div class="text-center mb-5">
+    <h1 class="display-5 mb-2" style="color: #1e293b; font-weight: 600;">
+      Система поддержки
+    </h1>
+    <p class="text-muted">
+      Создайте обращение или проверьте статус существующего
+    </p>
+  </div>
+
+  <!-- Кнопки действий -->
+  <div class="d-flex flex-column align-items-center">
+    <a href="/new-ticket" class="btn action-btn btn-create shadow">
+      📝 Создать заявку
+    </a>
+    
+    <a href="/get-ticket" class="btn action-btn btn-track shadow">
+      🔍 Отследить заявку
+    </a>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  console.log('Главная страница загружена');
+</script>
+{% endblock %}

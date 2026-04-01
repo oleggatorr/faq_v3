@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Доступ запрещён — Система поддержки</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    .error-container {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 3rem 0;
+      background-color: #f8f9fa;
+    }
+
+    .error-icon {
+      font-size: 5rem;
+      margin-bottom: 1rem;
+    }
+
+    .error-title {
+      font-size: 2rem;
+      font-weight: 600;
+      color: #1e293b;
+      margin-bottom: 1rem;
+    }
+
+    .error-message {
+      font-size: 1.125rem;
+      color: #64748b;
+      margin-bottom: 2rem;
+      text-align: center;
+      max-width: 500px;
+    }
+
+    .error-details {
+      background-color: #fef3c7;
+      border: 1px solid #fcd34d;
+      padding: 1rem;
+      border-radius: 0.5rem;
+      margin-bottom: 2rem;
+      max-width: 600px;
+    }
+
+    .error-details code {
+      background-color: #fffbeb;
+      padding: 0.25rem 0.5rem;
+      border-radius: 0.25rem;
+      font-size: 0.875rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="error-container">
+    <div class="error-icon">🔒</div>
+    <h1 class="error-title">Доступ запрещён</h1>
+    <p class="error-message">
+      {% if error %}
+        {{ error }}
+      {% else %}
+        У вас недостаточно прав для доступа к этой странице.
+      {% endif %}
+    </p>
+
+    {% if required_permission %}
+    <div class="error-details">
+      <strong>Требуемое право:</strong>
+      <br>
+      <code>{{ required_permission }}</code>
+    </div>
+    {% endif %}
+
+    <div class="d-flex gap-2">
+      <a href="/operator/home-page" class="btn btn-primary">
+        🏠 На главную
+      </a>
+      <a href="javascript:history.back()" class="btn btn-outline-secondary">
+        ← Назад
+      </a>
+    </div>
+  </div>
+</body>
+</html>

@@ -9,11 +9,16 @@ from app.core.audit import get_client_info
 from app.core.auth import (
     CurrentAgent,
     check_agent_view,
+    check_can_anonymize_tickets,
+    check_can_archive_tickets,
+    check_can_assign_others,
+    check_can_assign_self,
     check_can_del_tickets,
     check_can_edit_tickets,
     check_can_hard_del_tickets,
+    check_can_merge_tickets,
     check_can_reply_tickets,
-    check_can_view_all_tickets,
+    check_can_resolve,
     check_can_view_ass_others,
     check_can_view_own_tickets,
     check_can_view_tickets,
@@ -58,18 +63,23 @@ def create_ticket_form(
     db: Session = Depends(get_db),
 ):
     """Форма создания тикета оператором."""
+    from app.models.ticket import Priority
+    
     dept_service = DepartmentService(db)
     cat_service = QuestionCategoryService(db)
     departments = dept_service.list(filters={"is_active": True}, sort_by="name", limit=200)
     categories = cat_service.list(filters={"is_active": True}, sort_by="sort_order", limit=200)
-    
+    priorities = list(Priority)
+
     return templates.TemplateResponse(
-        "tickets/create.html",
+        "operator/tickets/create.html",
         {
             "request": request,
             "agent": agent,
             "departments": departments,
             "categories": categories,
+            "priorities": priorities,
+            "form_data": None,
         },
     )
 
@@ -323,8 +333,8 @@ def tickets_my(
     db: Session = Depends(get_db),
     status_ids: list[str] = Query([], description="Multiple status IDs"),
     category_id: str | None = Query(None),
-    sort_by: str = Query("created_at", description="Sort field"),
-    sort_desc: bool = Query(True, description="Sort descending"),
+    sort_by: str = Query("priority", description="Sort field"),
+    sort_desc: bool = Query(False, description="Sort descending"),
     limit: str | None = Query(None),
     offset: str | None = Query(None),
     archived: str = Query("active", description="Filter by archived: active, archived, all"),
@@ -404,27 +414,61 @@ def tickets_my(
             "total_count": total_count,
             "limit_int": limit_int,
             "offset_int": offset_int,
+            **agent.get_permissions_dict(),
         },
     )
+
+
+@router.post("/tickets/my/mark-all-read", response_class=RedirectResponse)
+def tickets_my_mark_all_read(
+    request: Request,
+    agent: AgentRead = Depends(check_can_view_own_tickets),
+    db: Session = Depends(get_db),
+):
+    """Отметить все тикеты агента как прочитанные."""
+    ticket_service = TicketService(db, agent_id=agent.id)
+    
+    # Получаем все тикеты агента
+    my_tickets = ticket_service.list(
+        filters={"owner_id": agent.id},
+        limit=999999
+    )
+    
+    # Отмечаем каждый как прочитанный
+    for ticket in my_tickets:
+        ticket_service.mark_as_read(ticket_id=ticket.id)
+    
+    request.session["flash_success"] = "Все тикеты отмечены как прочитанные"
+    
+    return RedirectResponse(url="/tickets/my", status_code=303)
 
 
 @router.get("/tickets/all", response_class=HTMLResponse)
 def tickets_all(
     request: Request,
-    agent: AgentRead = Depends(check_can_view_all_tickets),  # Право на просмотр всех тикетов
+    agent: AgentRead = Depends(check_can_view_unassigned),  # Право на просмотр неназначенных
     db: Session = Depends(get_db),
     q: str = Query("", description="Quick search by track_id/subject/customer"),
     status_ids: list[str] = Query([], description="Multiple status IDs"),
     category_id: str | None = Query(None),
-    sort_by: str = Query("created_at", description="Sort field"),
-    sort_desc: bool = Query(True, description="Sort descending"),
+    sort_by: str = Query("priority", description="Sort field"),
+    sort_desc: bool = Query(False, description="Sort descending"),
     limit: str | None = Query(None),
     offset: str | None = Query(None),
     archived: str = Query("active", description="Filter by archived: active, archived, all"),
     owner_filter: str = Query("unassigned", description="Filter by owner: unassigned, assigned, any"),
     owner_id: str | None = Query(None, description="Specific owner ID"),
 ):
-    """Все тикеты (требует права can_view_all_tickets или админ)."""
+    """Все тикеты (требует право can_view_unassigned или админ)."""
+    # Проверка прав на расширенный фильтр
+    perms = agent.get_permissions_dict()
+    is_admin = agent.role == 'admin'
+    
+    # Если выбран фильтр «Назначен на...» или «Все тикеты», нужно право can_view_ass_others
+    if owner_filter in ('assigned', 'any') and not perms.get('can_view_ass_others', False) and not is_admin:
+        # Принудительно сбрасываем на «Неназначенные»
+        owner_filter = 'unassigned'
+    
     # Обработка пустых значений
     limit_int = int(limit) if limit and limit.strip() else 20
     offset_int = int(offset) if offset and offset.strip() else 0
@@ -434,11 +478,13 @@ def tickets_all(
     category_service = QuestionCategoryService(db)
     status_service = TicketStatusService(db)
     agent_service = AgentService(db)
-    filters = _ticket_filters(request)
-
+    
     # Преобразуем пустые строки в None
     status_ids_int = [int(s) for s in status_ids if s and s.strip()]
     category_id_int = int(category_id) if category_id and category_id.strip() else None
+
+    # Получаем базовые фильтры из запроса
+    filters = _ticket_filters(request)
 
     if status_ids_int:
         filters["status_ids"] = status_ids_int
@@ -448,12 +494,14 @@ def tickets_all(
     if q and not any(filters.get(k) for k in ("track_id", "subject", "customer_name", "customer_email")):
         filters["track_id"] = q.strip()
 
-    # Фильтр по назначению
+    # Фильтр по назначению (перекрывает owner_id из _ticket_filters)
     if owner_filter == "unassigned":
-        filters["owner_id"] = None
+        filters["owner_id"] = "NULL"  # Специальное значение для IS NULL
     elif owner_filter == "assigned" and owner_id and owner_id.strip():
         filters["owner_id"] = int(owner_id)
-    # Если owner_filter == "any" — не фильтруем по owner_id
+    # Если owner_filter == "any" — удаляем owner_id из фильтров (оставляем как есть из _ticket_filters)
+    elif owner_filter == "any":
+        filters.pop("owner_id", None)  # Удаляем, если был установлен из _ticket_filters
 
     # Фильтр по архиву
     if archived == "active":
@@ -467,7 +515,7 @@ def tickets_all(
         sort_desc=sort_desc,
         limit=limit_int,
         offset=offset_int,
-        include_unread=True,
+        include_unread=False,
         agent_id=agent.id,
     )
     categories = category_service.list(limit=500)
@@ -784,6 +832,61 @@ async def admin_reply(
         except Exception:
             pass
 
+    # Автообновление статуса: если статус "Новая" (ID=1), меняем на "Ответ отправлен" (ID=2)
+    if not is_internal_bool and ticket.status_id == 1:
+        ticket_service.change_status(
+            ticket_id=ticket.id,
+            new_status_id=2,  # reply_sent: Ответ отправлен
+            agent_id=agent.id,
+        )
+
+    return RedirectResponse(url=f"/tickets/{ticket_id}", status_code=303)
+
+
+@router.post("/tickets/{ticket_id}/assign", response_class=RedirectResponse)
+def assign_ticket(
+    ticket_id: int,
+    request: Request,
+    agent: AgentRead = Depends(check_can_assign_others),
+    db: Session = Depends(get_db),
+    owner_id: str = Form(...),
+):
+    """Переназначить тикет другому оператору."""
+    ticket_service = TicketService(
+        db,
+        agent_id=agent.id,
+        ticket_event_service=TicketEventService(db),
+        ticket_read_state_service=TicketReadStateService(db),
+    )
+
+    try:
+        owner_id_int = int(owner_id)
+        if owner_id_int <= 0:
+            raise ValueError("Неверный ID оператора")
+
+        ticket_service.update_ticket(
+            ticket_id=ticket_id,
+            ticket_data=TicketUpdate(owner_id=owner_id_int),
+            agent_id=agent.id,
+        )
+
+        # Логируем изменение
+        client_info = get_client_info(request)
+        log_service = AuditLogService(db)
+        log_service.log_action(
+            action="update",
+            entity_type="ticket",
+            entity_id=ticket_id,
+            agent_id=agent.id,
+            details={"assigned_to": owner_id_int},
+            **client_info,
+        )
+
+        request.session["flash_success"] = f"Тикет переназначен на оператора #{owner_id_int}"
+
+    except Exception as e:
+        request.session["flash_error"] = f"Ошибка: {str(e)}"
+
     return RedirectResponse(url=f"/tickets/{ticket_id}", status_code=303)
 
 
@@ -791,7 +894,7 @@ async def admin_reply(
 def admin_update_ticket(
     ticket_id: int,
     request: Request,
-    agent: AgentRead = Depends(check_can_edit_tickets),
+    agent: AgentRead = Depends(check_can_view_tickets),
     db: Session = Depends(get_db),
     status_id: str = Form(""),
     priority: str = Form(""),
@@ -800,11 +903,11 @@ def admin_update_ticket(
 ):
     """
     Обновление тикета с проверкой прав на каждое поле.
-    
+
     Права:
     - status_id: can_edit_tickets
     - priority: can_edit_tickets
-    - owner_id: can_assign_tickets (или админ)
+    - owner_id: can_assign_tickets или can_assign_self
     - category_id: can_man_cat (или админ)
     """
     ticket_service = TicketService(
@@ -818,7 +921,7 @@ def admin_update_ticket(
     # Получаем права агента
     perms = agent.get_permissions_dict()
     is_admin = agent.role == 'admin'
-    
+
     # Статус (требует can_edit_tickets)
     if status_id and status_id.isdigit():
         if perms.get('can_edit_tickets', False) or is_admin:
@@ -832,10 +935,14 @@ def admin_update_ticket(
             except ValueError:
                 pass
 
-    # Исполнитель (требует can_assign_tickets или админ)
+    # Исполнитель (требует can_assign_tickets, can_assign_self или админ)
     if owner_id and owner_id.isdigit():
-        if perms.get('can_assign_tickets', False) or is_admin:
-            owner_val = int(owner_id)
+        owner_val = int(owner_id)
+        # Назначение себе (can_assign_self)
+        if owner_val == agent.id and (perms.get('can_assign_self', False) or is_admin):
+            update_data["owner_id"] = owner_val
+        # Назначение другим (can_assign_tickets)
+        elif perms.get('can_assign_tickets', False) or is_admin:
             update_data["owner_id"] = owner_val if owner_val > 0 else None
 
     # Категория (требует can_man_cat или админ)
@@ -874,12 +981,57 @@ def admin_update_ticket(
     return RedirectResponse(url=f"/tickets/{ticket_id}", status_code=303)
 
 
+@router.post("/tickets/{ticket_id}/resolve", response_class=RedirectResponse)
+def resolve_ticket(
+    ticket_id: int,
+    request: Request,
+    agent: AgentRead = Depends(check_can_resolve),
+    db: Session = Depends(get_db),
+):
+    """Отметить тикет как решённый (закрытый статус)."""
+    ticket_service = TicketService(
+        db,
+        agent_id=agent.id,
+        ticket_event_service=TicketEventService(db),
+        ticket_read_state_service=TicketReadStateService(db),
+    )
+
+    # Статус "Решена" (ID=4)
+    RESOLVED_STATUS_ID = 4
+
+    try:
+        ticket_service.change_status(
+            ticket_id=ticket_id,
+            new_status_id=RESOLVED_STATUS_ID,
+            agent_id=agent.id,
+        )
+
+        # Логируем смену статуса
+        client_info = get_client_info(request)
+        log_service = AuditLogService(db)
+        log_service.log_action(
+            action="update",
+            entity_type="ticket",
+            entity_id=ticket_id,
+            agent_id=agent.id,
+            details={"resolved_by": agent.full_name, "new_status_id": RESOLVED_STATUS_ID},
+            **client_info,
+        )
+
+        request.session["flash_success"] = "Тикет отмечен как решённый ✅"
+
+    except Exception as e:
+        request.session["flash_error"] = f"Ошибка: {str(e)}"
+
+    return RedirectResponse(url=f"/tickets/{ticket_id}", status_code=303)
+
+
 @router.post("/tickets/{ticket_id}/delete")
 async def delete_ticket(
     request: Request,
     ticket_id: int,
     db: Session = Depends(get_db),
-    agent: AgentRead = Depends(check_can_del_tickets),
+    agent: AgentRead = Depends(check_can_archive_tickets),
 ):
     # Сервис сам проверит права внутри (двойная защита)
     ticket_service = TicketService(db, agent_id=agent.id)
@@ -890,7 +1042,7 @@ async def delete_ticket(
 
     if not result.success:
         raise HTTPException(status_code=404, detail=result.detail or "Тикет не найден")
-    
+
     # Логируем удаление тикета
     client_info = get_client_info(request)
     log_service = AuditLogService(db)
@@ -980,9 +1132,11 @@ async def tickets_bulk_operation(
     request: Request,
     db: Session = Depends(get_db),
     ticket_ids: str = Form(...),  # JSON array of ticket IDs
-    operation: str = Form(...),  # archive, delete, assign, change_status, mark_read, hard_delete
+    operation: str = Form(...),  # archive, delete, assign, assign_self, change_status, change_priority, mark_read, hard_delete, merge
     owner_id: str | None = Form(None),
     status_id: str | None = Form(None),
+    priority: str | None = Form(None),
+    target_ticket_id: str | None = Form(None),  # Для операции merge
 ):
     """Массовые операции с тикетами."""
     import json
@@ -991,6 +1145,21 @@ async def tickets_bulk_operation(
     if operation == 'mark_read':
         # Для отметки прочитанным достаточно права просмотра своих тикетов
         agent = check_can_view_own_tickets(request, db)
+    elif operation == 'archive':
+        # Для архивации нужно специальное право
+        agent = check_can_archive_tickets(request, db)
+    elif operation == 'hard_delete':
+        # Для полного удаления нужно специальное право
+        agent = check_can_hard_del_tickets(request, db)
+    elif operation == 'assign_self':
+        # Для назначения себе нужно право can_assign_self
+        agent = check_can_assign_self(request, db)
+    elif operation == 'assign':
+        # Для назначения другим нужно право can_assign_others
+        agent = check_can_assign_others(request, db)
+    elif operation == 'merge':
+        # Для слияния нужно право can_merge_tickets
+        agent = check_can_merge_tickets(request, db)
     else:
         # Для остальных операций нужно право на редактирование
         agent = check_can_edit_tickets(request, db)
@@ -1016,6 +1185,53 @@ async def tickets_bulk_operation(
     success_count = 0
     error_count = 0
 
+    # Обработка слияния (отдельно, до цикла)
+    if operation == 'merge' and target_ticket_id:
+        try:
+            target_id_int = int(target_ticket_id)
+            
+            # Объединяем все выбранные тикеты (кроме целевого) в целевой
+            merged_count = 0
+            for source_id in ids:
+                if int(source_id) != target_id_int:
+                    ticket_service.merge_tickets(
+                        source_ticket_id=int(source_id),
+                        target_ticket_id=target_id_int,
+                        agent_id=agent.id,
+                    )
+                    merged_count += 1
+            
+            success_count = merged_count
+
+            # Логируем слияние
+            client_info = get_client_info(request)
+            log_service = AuditLogService(db)
+            log_service.log_action(
+                action="merge",
+                entity_type="ticket",
+                entity_id=target_id_int,
+                agent_id=agent.id,
+                details={"bulk_operation": "merge", "target_ticket_id": target_id_int, "merged_count": merged_count},
+                **client_info,
+            )
+        except Exception as merge_error:
+            error_count += 1
+            print(f"Merge error: {merge_error}")
+        
+        # Flash-сообщение
+        if success_count > 0:
+            request.session["flash_success"] = f"Объединено тикетов: {success_count}"
+        if error_count > 0:
+            request.session["flash_error"] = f"Ошибок: {error_count}"
+
+        # Возвращаем на страницу, откуда пришли (Referer)
+        referer = request.headers.get("referer")
+        if referer:
+            return RedirectResponse(url=referer, status_code=303)
+        else:
+            return RedirectResponse(url="/tickets", status_code=303)
+
+    # Остальные операции обрабатываем в цикле
     for ticket_id in ids:
         try:
             ticket = ticket_service.get(ticket_id=ticket_id)
@@ -1154,14 +1370,29 @@ async def tickets_bulk_operation(
                         **client_info,
                     )
 
-            elif operation == 'assign' and owner_id:
-                ticket_service.update_ticket(
-                    ticket_id=ticket_id,
-                    ticket_data=TicketUpdate(owner_id=owner_id),
-                    agent_id=agent.id,
-                )
-                success_count += 1
+            elif operation == 'assign':
+                # Назначение или снятие назначения
+                # owner_id = "0" означает снятие назначения (owner_id = None)
+                from app.models.ticket import Ticket
                 
+                if owner_id == "0":
+                    # Снятие назначения - прямое обновление в БД
+                    db.query(Ticket).filter(Ticket.id == ticket_id).update({"owner_id": None})
+                    db.commit()
+                    new_owner_id = None
+                elif owner_id and owner_id.isdigit():
+                    # Назначение на оператора
+                    new_owner_id = int(owner_id)
+                    ticket_service.update_ticket(
+                        ticket_id=ticket_id,
+                        ticket_data=TicketUpdate(owner_id=new_owner_id),
+                        agent_id=agent.id,
+                    )
+                else:
+                    new_owner_id = None
+                
+                success_count += 1
+
                 # Логируем назначение
                 client_info = get_client_info(request)
                 log_service = AuditLogService(db)
@@ -1170,7 +1401,28 @@ async def tickets_bulk_operation(
                     entity_type="ticket",
                     entity_id=ticket_id,
                     agent_id=agent.id,
-                    details={"bulk_operation": "assign", "track_id": ticket.track_id, "new_owner_id": owner_id},
+                    details={"bulk_operation": "assign", "track_id": ticket.track_id, "new_owner_id": new_owner_id},
+                    **client_info,
+                )
+
+            elif operation == 'assign_self':
+                # Назначить тикет себе
+                ticket_service.update_ticket(
+                    ticket_id=ticket_id,
+                    ticket_data=TicketUpdate(owner_id=agent.id),
+                    agent_id=agent.id,
+                )
+                success_count += 1
+
+                # Логируем назначение
+                client_info = get_client_info(request)
+                log_service = AuditLogService(db)
+                log_service.log_action(
+                    action="update",
+                    entity_type="ticket",
+                    entity_id=ticket_id,
+                    agent_id=agent.id,
+                    details={"bulk_operation": "assign_self", "track_id": ticket.track_id},
                     **client_info,
                 )
 
@@ -1181,7 +1433,7 @@ async def tickets_bulk_operation(
                     agent_id=agent.id,
                 )
                 success_count += 1
-                
+
                 # Логируем изменение статуса
                 client_info = get_client_info(request)
                 log_service = AuditLogService(db)
@@ -1194,6 +1446,29 @@ async def tickets_bulk_operation(
                     **client_info,
                 )
 
+            elif operation == 'change_priority' and priority:
+                try:
+                    ticket_service.update_ticket(
+                        ticket_id=ticket_id,
+                        ticket_data=TicketUpdate(priority=Priority(priority)),
+                        agent_id=agent.id,
+                    )
+                    success_count += 1
+
+                    # Логируем изменение приоритета
+                    client_info = get_client_info(request)
+                    log_service = AuditLogService(db)
+                    log_service.log_action(
+                        action="update",
+                        entity_type="ticket",
+                        entity_id=ticket_id,
+                        agent_id=agent.id,
+                        details={"bulk_operation": "change_priority", "track_id": ticket.track_id, "new_priority": priority},
+                        **client_info,
+                    )
+                except ValueError:
+                    error_count += 1
+
         except Exception as e:
             error_count += 1
             print(f"Error processing ticket {ticket_id}: {e}")
@@ -1204,12 +1479,12 @@ async def tickets_bulk_operation(
     if error_count > 0:
         request.session["flash_error"] = f"Ошибок: {error_count}"
 
-    # Возвращаем на ту же страницу, где был пользователь
-    if operation == 'mark_read':
-        # Для отметки прочитанными возвращаем на /tickets/my
-        return RedirectResponse(url="/tickets/my", status_code=303)
+    # Возвращаем на страницу, откуда пришли (Referer)
+    referer = request.headers.get("referer")
+    if referer:
+        return RedirectResponse(url=referer, status_code=303)
     else:
-        # Для остальных операций возвращаем на /tickets
+        # Если Referer нет, возвращаем на /tickets
         return RedirectResponse(url="/tickets", status_code=303)
 
 
@@ -1386,33 +1661,33 @@ def anonymize_message(
 def anonymize_ticket(
     ticket_id: int,
     request: Request,
-    agent: AgentRead = Depends(check_can_edit_tickets),
+    agent: AgentRead = Depends(check_can_anonymize_tickets),
     db: Session = Depends(get_db),
 ):
     """
     Анонимизировать тикет.
-    
+
     Устанавливает флаг is_anonymized.
     При чтении данные будут заменяться на "Аноним".
     """
     from app.models.ticket import Ticket
-    
+
     ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
     if ticket is None:
         request.session["flash_error"] = "Тикет не найден"
         return RedirectResponse(url="/tickets", status_code=303)
-    
+
     try:
         # Устанавливаем флаг анонимизации
         ticket.is_anonymized = True
         db.commit()
-        
+
         request.session["flash_success"] = f"Тикет {ticket.track_id} анонимизирован"
-        
+
     except Exception as e:
         db.rollback()
         request.session["flash_error"] = f"Ошибка: {str(e)}"
-    
+
     return RedirectResponse(url=f"/tickets/{ticket_id}", status_code=303)
 
 
@@ -1575,10 +1850,9 @@ def bans_list(
     db: Session = Depends(get_db),
 ):
     """Страница управления банами (email и IP)."""
-    ban_service = BanService(db)
-    banned_emails = ban_service.get_banned_emails(db)
-    banned_ips = ban_service.get_banned_ips(db)
-    
+    banned_emails = BanService.get_banned_emails(db)
+    banned_ips = BanService.get_banned_ips(db)
+
     return templates.TemplateResponse(
         "operator/bans/list.html",
         {
@@ -1599,10 +1873,8 @@ def ban_email_add(
     reason: str = Form(""),
 ):
     """Добавить email в бан-лист."""
-    ban_service = BanService(db)
-    
     try:
-        ban_service.add_email_ban(
+        BanService.add_email_ban(
             db=db,
             email=email.strip(),
             banned_by=agent.id,
@@ -1611,7 +1883,7 @@ def ban_email_add(
         request.session["flash_success"] = f"Email '{email}' добавлен в чёрный список."
     except ValueError as e:
         request.session["flash_error"] = str(e)
-    
+
     return RedirectResponse(url="/bans", status_code=303)
 
 
@@ -1623,13 +1895,11 @@ def ban_email_remove(
     db: Session = Depends(get_db),
 ):
     """Удалить email из бан-листа."""
-    ban_service = BanService(db)
-    
-    if ban_service.remove_email_ban(db, ban_id):
+    if BanService.remove_email_ban(db, ban_id):
         request.session["flash_success"] = "Email удалён из чёрного списка."
     else:
         request.session["flash_error"] = "Бан не найден."
-    
+
     return RedirectResponse(url="/bans", status_code=303)
 
 
@@ -1644,32 +1914,30 @@ def ban_ip_add(
 ):
     """Добавить IP или диапазон IP в бан-лист."""
     from app.services.utils import ip_to_int
-    
-    ban_service = BanService(db)
-    
+
     try:
         # Валидация IP
         ip_to_int(ip_from)
         ip_to_val = ip_to.strip() if ip_to and ip_to.strip() else None
         if ip_to_val:
             ip_to_int(ip_to_val)
-        
-        ban_service.add_ip_ban(
+
+        BanService.add_ip_ban(
             db=db,
             ip_from=ip_from.strip(),
             ip_to=ip_to_val if ip_to_val else None,
             banned_by=agent.id,
             ip_display=ip_display.strip() if ip_display and ip_display.strip() else None,
         )
-        
+
         display = ip_display.strip() if ip_display and ip_display.strip() else (
             f"{ip_from} - {ip_to_val}" if ip_to_val else ip_from
         )
         request.session["flash_success"] = f"IP-диапазон '{display}' добавлен в чёрный список."
-        
+
     except ValueError as e:
         request.session["flash_error"] = f"Неверный формат IP: {e}"
-    
+
     return RedirectResponse(url="/bans", status_code=303)
 
 
@@ -1681,11 +1949,9 @@ def ban_ip_remove(
     db: Session = Depends(get_db),
 ):
     """Удалить IP из бан-листа."""
-    ban_service = BanService(db)
-    
-    if ban_service.remove_ip_ban(db, ban_id):
+    if BanService.remove_ip_ban(db, ban_id):
         request.session["flash_success"] = "IP удалён из чёрного списка."
     else:
         request.session["flash_error"] = "Бан не найден."
-    
+
     return RedirectResponse(url="/bans", status_code=303)

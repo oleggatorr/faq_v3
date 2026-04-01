@@ -10,7 +10,7 @@ load_dotenv()
 
 class Settings:
     SECRET_KEY: str = os.getenv("SECRET_KEY", "change-me-in-production-use-env")
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1440"))  # 24 часа (1440 минут)
     COOKIE_NAME: str = os.getenv("AUTH_COOKIE_NAME", "auth_token")  # Изменили имя cookie
     SESSION_COOKIE_NAME: str = os.getenv("SESSION_COOKIE_NAME", "session")  # Cookie для сессии
     COOKIE_MAX_AGE: int = int(os.getenv("AUTH_COOKIE_MAX_AGE", "86400"))  # 24h

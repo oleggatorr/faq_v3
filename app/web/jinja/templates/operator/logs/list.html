@@ -41,6 +41,17 @@
     padding: 1rem;
     margin-bottom: 1.5rem;
   }
+
+  .pagination .page-item.active .page-link {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+    color: #fff;
+    font-weight: 600;
+  }
+
+  .pagination .page-item .page-link {
+    color: #0d6efd;
+  }
 </style>
 {% endblock %}
 
@@ -99,6 +110,22 @@
           <button type="submit" class="btn btn-sm btn-secondary flex-fill">🔍</button>
           <a href="/logs" class="btn btn-sm btn-outline-secondary">✕</a>
         </div>
+
+        <!-- Дополнительные настройки -->
+        <div class="col-12">
+          <details class="mt-2">
+            <summary class="text-muted small" style="cursor: pointer;">⚙️ Дополнительные настройки</summary>
+            <div class="row g-2 align-items-end mt-2 pt-3 border-top">
+              <div class="col-md-2">
+                <label for="limit" class="form-label small">Лимит</label>
+                <input type="number" name="limit" id="limit" class="form-control form-control-sm" value="{{ limit }}" min="10" max="500" step="10" />
+              </div>
+              <div class="col-md-2 d-flex align-items-end">
+                <button type="submit" class="btn btn-sm btn-primary">Применить</button>
+              </div>
+            </div>
+          </details>
+        </div>
       </form>
     </div>
   </div>
@@ -107,6 +134,48 @@
   <div class="log-stats">
     📄 Найдено записей: <strong>{{ total_count }}</strong>
   </div>
+
+  <!-- Пагинация (верхняя) -->
+  {% if logs and logs|length > 0 %}
+  {% set total_pages = (total_count + limit - 1) // limit if limit and limit > 0 else 1 %}
+  {% set current_page = (offset // limit) + 1 if offset and limit and limit > 0 else 1 %}
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <p class="text-muted small mb-0">Страница <strong>{{ current_page }}</strong> из <strong>{{ total_pages }}</strong></p>
+    </div>
+    <nav>
+      <ul class="pagination pagination-sm mb-0">
+        {% if current_page > 1 %}
+          <li class="page-item">
+            <a class="page-link" href="?offset=0&limit={{ limit }}{% if action_filter %}&action={{ action_filter }}{% endif %}{% if entity_type_filter %}&entity_type={{ entity_type_filter }}{% endif %}{% if agent_id_filter %}&agent_id={{ agent_id_filter }}{% endif %}">Первая</a>
+          </li>
+          <li class="page-item">
+            <a class="page-link" href="?offset={{ (current_page - 2) * limit }}&limit={{ limit }}{% if action_filter %}&action={{ action_filter }}{% endif %}{% if entity_type_filter %}&entity_type={{ entity_type_filter }}{% endif %}{% if agent_id_filter %}&agent_id={{ agent_id_filter }}{% endif %}">← Назад</a>
+          </li>
+        {% endif %}
+
+        {% for p in range(1, total_pages + 1) %}
+          {% if p == current_page %}
+            <li class="page-item active"><span class="page-link">{{ p }}</span></li>
+          {% elif p >= current_page - 2 and p <= current_page + 2 %}
+            <li class="page-item">
+              <a class="page-link" href="?offset={{ (p - 1) * limit }}&limit={{ limit }}{% if action_filter %}&action={{ action_filter }}{% endif %}{% if entity_type_filter %}&entity_type={{ entity_type_filter }}{% endif %}{% if agent_id_filter %}&agent_id={{ agent_id_filter }}{% endif %}">{{ p }}</a>
+            </li>
+          {% endif %}
+        {% endfor %}
+
+        {% if current_page < total_pages %}
+          <li class="page-item">
+            <a class="page-link" href="?offset={{ current_page * limit }}&limit={{ limit }}{% if action_filter %}&action={{ action_filter }}{% endif %}{% if entity_type_filter %}&entity_type={{ entity_type_filter }}{% endif %}{% if agent_id_filter %}&agent_id={{ agent_id_filter }}{% endif %}">Вперёд →</a>
+          </li>
+          <li class="page-item">
+            <a class="page-link" href="?offset={{ (total_pages - 1) * limit }}&limit={{ limit }}{% if action_filter %}&action={{ action_filter }}{% endif %}{% if entity_type_filter %}&entity_type={{ entity_type_filter }}{% endif %}{% if agent_id_filter %}&agent_id={{ agent_id_filter }}{% endif %}">Последняя</a>
+          </li>
+        {% endif %}
+      </ul>
+    </nav>
+  </div>
+  {% endif %}
 
   <!-- Таблица логов -->
   <div class="content-card">
@@ -177,20 +246,40 @@
         </table>
       </div>
 
-      <!-- Пагинация -->
-      {% if logs|length == limit or offset > 0 %}
+      <!-- Пагинация (нижняя) -->
+      {% if logs and logs|length > 0 %}
       <div class="d-flex justify-content-between align-items-center p-3">
-        <p class="text-muted small mb-0">Показано с {{ offset + 1 }} по {{ [offset + limit, total_count]|min }} из {{ total_count }}</p>
+        <div>
+          <p class="text-muted small mb-0">Показано с {{ offset + 1 }} по {{ [offset + limit, total_count]|min }} из {{ total_count }}</p>
+          <p class="text-muted small mb-0 mt-1"><strong>Всего записей: {{ total_count }}</strong></p>
+        </div>
         <nav>
           <ul class="pagination pagination-sm mb-0">
-            {% if offset > 0 %}
+            {% if current_page > 1 %}
               <li class="page-item">
-                <a class="page-link" href="?offset={{ [0, offset - limit]|max }}&limit={{ limit }}{% if action_filter %}&action={{ action_filter }}{% endif %}{% if entity_type_filter %}&entity_type={{ entity_type_filter }}{% endif %}{% if agent_id_filter %}&agent_id={{ agent_id_filter }}{% endif %}">← Назад</a>
+                <a class="page-link" href="?offset=0&limit={{ limit }}{% if action_filter %}&action={{ action_filter }}{% endif %}{% if entity_type_filter %}&entity_type={{ entity_type_filter }}{% endif %}{% if agent_id_filter %}&agent_id={{ agent_id_filter }}{% endif %}">Первая</a>
+              </li>
+              <li class="page-item">
+                <a class="page-link" href="?offset={{ (current_page - 2) * limit }}&limit={{ limit }}{% if action_filter %}&action={{ action_filter }}{% endif %}{% if entity_type_filter %}&entity_type={{ entity_type_filter }}{% endif %}{% if agent_id_filter %}&agent_id={{ agent_id_filter }}{% endif %}">← Назад</a>
               </li>
             {% endif %}
-            {% if logs|length == limit %}
+
+            {% for p in range(1, total_pages + 1) %}
+              {% if p == current_page %}
+                <li class="page-item active"><span class="page-link">{{ p }}</span></li>
+              {% elif p >= current_page - 2 and p <= current_page + 2 %}
+                <li class="page-item">
+                  <a class="page-link" href="?offset={{ (p - 1) * limit }}&limit={{ limit }}{% if action_filter %}&action={{ action_filter }}{% endif %}{% if entity_type_filter %}&entity_type={{ entity_type_filter }}{% endif %}{% if agent_id_filter %}&agent_id={{ agent_id_filter }}{% endif %}">{{ p }}</a>
+                </li>
+              {% endif %}
+            {% endfor %}
+
+            {% if current_page < total_pages %}
               <li class="page-item">
-                <a class="page-link" href="?offset={{ offset + limit }}&limit={{ limit }}{% if action_filter %}&action={{ action_filter }}{% endif %}{% if entity_type_filter %}&entity_type={{ entity_type_filter }}{% endif %}{% if agent_id_filter %}&agent_id={{ agent_id_filter }}{% endif %}">Вперёд →</a>
+                <a class="page-link" href="?offset={{ current_page * limit }}&limit={{ limit }}{% if action_filter %}&action={{ action_filter }}{% endif %}{% if entity_type_filter %}&entity_type={{ entity_type_filter }}{% endif %}{% if agent_id_filter %}&agent_id={{ agent_id_filter }}{% endif %}">Вперёд →</a>
+              </li>
+              <li class="page-item">
+                <a class="page-link" href="?offset={{ (total_pages - 1) * limit }}&limit={{ limit }}{% if action_filter %}&action={{ action_filter }}{% endif %}{% if entity_type_filter %}&entity_type={{ entity_type_filter }}{% endif %}{% if agent_id_filter %}&agent_id={{ agent_id_filter }}{% endif %}">Последняя</a>
               </li>
             {% endif %}
           </ul>

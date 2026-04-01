@@ -38,24 +38,9 @@
     </div>
 
     <div class="col-md-4">
-      <div class="card h-100 card-border-success">
-        <div class="card-body text-center p-4">
-          <div class="mb-3" style="font-size: 2.5rem;">📥</div>
-          <h3 class="h6 mb-2">Неназначенные</h3>
-          <p class="text-muted mb-3 small">
-            Новые тикеты для назначения
-          </p>
-          <a href="/tickets/unassigned" class="btn btn-success btn-sm">
-            Перейти
-          </a>
-        </div>
-      </div>
-    </div>
-
-    <div class="col-md-4">
       <div class="card h-100" style="border-left: 3px solid #0ea5e9 !important;">
         <div class="card-body text-center p-4">
-          <div class="mb-3" style="font-size: 2.5rem;">📂</div>
+          <div class="mb-3" style="font-size: 2.5rem;">�</div>
           <h3 class="h6 mb-2">Все тикеты</h3>
           <p class="text-muted mb-3 small">
             Полный список тикетов
@@ -66,66 +51,47 @@
         </div>
       </div>
     </div>
-  </div>
 
-  <!-- Дополнительная навигация -->
-  <div class="row g-4 justify-content-center">
-    <div class="col-md-3">
-      <div class="card">
-        <div class="card-body text-center p-3">
-          <a href="/tickets/others" class="text-decoration-none" style="color: #1e293b;">
-            <div class="mb-2" style="font-size: 1.75rem;">👥</div>
-            <small style="font-weight: 500;">Чужие тикеты</small>
-          </a>
-        </div>
-      </div>
-    </div>
-
-    <div class="col-md-3">
-      <div class="card">
-        <div class="card-body text-center p-3">
-          <a href="/tickets/create" class="text-decoration-none" style="color: #1e293b;">
-            <div class="mb-2" style="font-size: 1.75rem;">➕</div>
-            <small style="font-weight: 500;">Создать тикет</small>
-          </a>
-        </div>
-      </div>
-    </div>
-
-    <div class="col-md-3">
-      <div class="card">
-        <div class="card-body text-center p-3">
-          <a href="/accaunt" class="text-decoration-none" style="color: #1e293b;">
-            <div class="mb-2" style="font-size: 1.75rem;">⚙️</div>
-            <small style="font-weight: 500;">Настройки</small>
+    <div class="col-md-4">
+      <div class="card h-100">
+        <div class="card-body text-center p-4">
+          <div class="mb-3" style="font-size: 2.5rem;">➕</div>
+          <h3 class="h6 mb-2">Создать тикет</h3>
+          <p class="text-muted mb-3 small">
+            Новая заявка от клиента
+          </p>
+          <a href="/tickets/create" class="btn btn-success btn-sm">
+            Перейти
           </a>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Статистика (опционально) -->
+  
+
+  <!-- Статистика -->
   <div class="card mt-5">
     <div class="card-header">
-      📊 Быстрая статистика
+      📊 Моя статистика
     </div>
     <div class="card-body">
       <div class="row text-center">
         <div class="col-md-3">
-          <div class="mb-2" style="font-size: 2rem; color: #2563eb;">—</div>
+          <div class="mb-2" style="font-size: 2rem; color: #2563eb;">{{ stats.total_my_tickets }}</div>
           <small class="text-muted">Мои тикеты</small>
         </div>
         <div class="col-md-3">
-          <div class="mb-2" style="font-size: 2rem; color: #16a34a;">—</div>
+          <div class="mb-2" style="font-size: 2rem; color: #16a34a;">{{ stats.in_progress }}</div>
           <small class="text-muted">В работе</small>
         </div>
         <div class="col-md-3">
-          <div class="mb-2" style="font-size: 2rem; color: #ca8a04;">—</div>
+          <div class="mb-2" style="font-size: 2rem; color: #ca8a04;">{{ stats.awaiting_response }}</div>
           <small class="text-muted">Ожидают ответа</small>
         </div>
         <div class="col-md-3">
-          <div class="mb-2" style="font-size: 2rem; color: #64748b;">—</div>
-          <small class="text-muted">Закрыты сегодня</small>
+          <div class="mb-2" style="font-size: 2rem; color: #64748b;">{{ stats.solved_today }}</div>
+          <small class="text-muted">Решено сегодня</small>
         </div>
       </div>
     </div>

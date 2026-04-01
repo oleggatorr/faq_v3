@@ -170,6 +170,37 @@ def check_can_hard_del_tickets(request: Request, db: Session = Depends(get_db)) 
         raise AccessDeniedError("Нет прав доступа", required_permission="can_hard_del_tickets")
     return agent
 
+
+def check_can_anonymize_tickets(request: Request, db: Session = Depends(get_db)) -> AgentRead:
+    """Проверка права на анонимизацию тикетов."""
+    agent = get_current_agent(request, db)
+    if is_admin(agent):
+        return agent
+    if not has_permission(agent, Permission.can_anonymize_tickets):
+        raise AccessDeniedError("Нет прав доступа", required_permission="can_anonymize_tickets")
+    return agent
+
+
+def check_can_archive_tickets(request: Request, db: Session = Depends(get_db)) -> AgentRead:
+    """Проверка права на отправку тикетов в архив."""
+    agent = get_current_agent(request, db)
+    if is_admin(agent):
+        return agent
+    if not has_permission(agent, Permission.can_archive_tickets):
+        raise AccessDeniedError("Нет прав доступа", required_permission="can_archive_tickets")
+    return agent
+
+
+def check_can_resolve(request: Request, db: Session = Depends(get_db)) -> AgentRead:
+    """Проверка права на закрытие (решение) тикетов."""
+    agent = get_current_agent(request, db)
+    if is_admin(agent):
+        return agent
+    if not has_permission(agent, Permission.can_resolve):
+        raise AccessDeniedError("Нет прав доступа", required_permission="can_resolve")
+    return agent
+
+
 def check_can_view_unassigned(request: Request, db: Session = Depends(get_db)) -> AgentRead:
     """Проверка права на просмотр неназначенных тикетов."""
     agent = get_current_agent(request, db)
@@ -197,30 +228,36 @@ def check_can_view_own_tickets(request: Request, db: Session = Depends(get_db)) 
         raise AccessDeniedError("Нет прав доступа", required_permission="can_view_own_tickets")
     return agent
 
-def check_can_view_all_tickets(request: Request, db: Session = Depends(get_db)) -> AgentRead:
-    """
-    Проверка права на просмотр всех тикетов.
-    Требуется наличие всех трёх прав или админка.
-    """
+
+def check_can_assign_others(request: Request, db: Session = Depends(get_db)) -> AgentRead:
+    """Проверка права на назначение тикетов другим операторам."""
     agent = get_current_agent(request, db)
     if is_admin(agent):
         return agent
-    
-    # Проверяем все три права
-    missing = []
-    if not has_permission(agent, Permission.can_view_own_tickets):
-        missing.append("can_view_own_tickets")
-    if not has_permission(agent, Permission.can_view_unassigned):
-        missing.append("can_view_unassigned")
-    if not has_permission(agent, Permission.can_view_ass_others):
-        missing.append("can_view_ass_others")
-    
-    if missing:
-        raise AccessDeniedError(
-            f"Нет прав на просмотр всех тикетов. Требуются: {', '.join(missing)}",
-            required_permission="can_view_all_tickets",
-        )
+    if not has_permission(agent, Permission.can_assign_others):
+        raise AccessDeniedError("Нет прав доступа", required_permission="can_assign_others")
     return agent
+
+
+def check_can_assign_self(request: Request, db: Session = Depends(get_db)) -> AgentRead:
+    """Проверка права на назначение тикета себе."""
+    agent = get_current_agent(request, db)
+    if is_admin(agent):
+        return agent
+    if not has_permission(agent, Permission.can_assign_self):
+        raise AccessDeniedError("Нет прав доступа", required_permission="can_assign_self")
+    return agent
+
+
+def check_can_merge_tickets(request: Request, db: Session = Depends(get_db)) -> AgentRead:
+    """Проверка права на объединение тикетов."""
+    agent = get_current_agent(request, db)
+    if is_admin(agent):
+        return agent
+    if not has_permission(agent, Permission.can_merge_tickets):
+        raise AccessDeniedError("Нет прав доступа", required_permission="can_merge_tickets")
+    return agent
+
 
 def check_agent_view(request: Request, db: Session = Depends(get_db)) -> AgentRead:
     agent = get_current_agent(request, db)

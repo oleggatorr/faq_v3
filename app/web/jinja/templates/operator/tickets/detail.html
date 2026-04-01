@@ -114,18 +114,23 @@
 {% endblock %}
 
 {% block content %}
-<div class="py-4">
-  <!-- Навигация -->
-  <div class="mb-4">
-    <a href="/tickets/my" class="btn btn-outline-secondary btn-sm">← Мои тикеты</a>
-    <a href="/tickets/all" class="btn btn-outline-secondary btn-sm ms-2">📂 Все тикеты</a>
-    <a href="/tickets/unassigned" class="btn btn-outline-secondary btn-sm ms-2">📥 Неназначенные</a>
-    <a href="/tickets/others" class="btn btn-outline-secondary btn-sm ms-2">👥 Чужие тикеты</a>
-  </div>
+
 
   {% if error %}
     <div class="alert alert-danger" role="alert">
       {{ error }}
+    </div>
+  {% endif %}
+
+  {% if request.session.get('flash_success') %}
+    <div class="alert alert-success" role="alert">
+      {{ request.session.pop('flash_success') }}
+    </div>
+  {% endif %}
+
+  {% if request.session.get('flash_error') %}
+    <div class="alert alert-danger" role="alert">
+      {{ request.session.pop('flash_error') }}
     </div>
   {% endif %}
 
@@ -148,7 +153,17 @@
           {% endif %}
         {% else %}
           <div class="btn-group" role="group">
-            {% if can_edit_tickets %}
+            {% if can_resolve %}
+            <form method="post" action="/tickets/{{ ticket.id }}/resolve" class="d-inline">
+              <button type="submit" class="btn btn-sm btn-outline-success"
+                      title="Отметить как решённое"
+                      onclick="return confirm('✅ Отметить тикет как решённый?');">
+                ✅ Решить
+              </button>
+            </form>
+            {% endif %}
+
+            {% if can_anonymize_tickets %}
             <button type="button" class="btn btn-sm btn-outline-secondary"
                     data-bs-toggle="modal" data-bs-target="#anonymizeModal"
                     title="Анонимизировать тикет">
@@ -156,7 +171,7 @@
             </button>
             {% endif %}
 
-            {% if can_del_tickets %}
+            {% if can_archive_tickets %}
             <form method="post" action="/tickets/{{ ticket.id }}/delete" class="d-inline"
                   onsubmit="return confirm('⚠️ Вы уверены, что хотите отправить тикет в архив?');">
               <button type="submit" class="btn btn-sm btn-outline-danger">
@@ -183,6 +198,29 @@
         <value>{{ ticket.customer_name }}</value>
         <br>
         <a href="mailto:{{ ticket.customer_email }}">{{ ticket.customer_email }}</a>
+        <br>
+        <small class="text-muted">IP: {{ ticket.customer_ip }}</small>
+        {% if can_ban_emails or can_ban_ips %}
+        <br>
+          {% if can_ban_emails %}
+          <form method="post" action="/bans/email/add" class="d-inline mt-1">
+            <input type="hidden" name="email" value="{{ ticket.customer_email }}" />
+            <input type="hidden" name="reason" value="Бан из тикета {{ ticket.track_id }}" />
+            <button type="submit" class="btn btn-sm btn-outline-danger" title="Заблокировать email" onclick="return confirm('⚠️ Заблокировать email {{ ticket.customer_email }}?');">
+              🚫 Email
+            </button>
+          </form>
+          {% endif %}
+          {% if can_ban_ips %}
+          <form method="post" action="/bans/ip/add" class="d-inline mt-1 ms-1">
+            <input type="hidden" name="ip_from" value="{{ ticket.customer_ip }}" />
+            <input type="hidden" name="ip_display" value="{{ ticket.customer_ip }} (тикет {{ ticket.track_id }})" />
+            <button type="submit" class="btn btn-sm btn-outline-danger" title="Заблокировать IP" onclick="return confirm('⚠️ Заблокировать IP {{ ticket.customer_ip }}?');">
+              🚫 IP
+            </button>
+          </form>
+          {% endif %}
+        {% endif %}
       </div>
       
       <div class="info-item">
@@ -196,7 +234,7 @@
       
       <div class="info-item">
         <label>Статус</label>
-        <span class="badge {% if status_name_by_id.get(ticket.status_id, '') == 'Новый' %}bg-info{% elif status_name_by_id.get(ticket.status_id, '') == 'В работе' %}bg-warning{% elif status_name_by_id.get(ticket.status_id, '') == 'Закрыт' %}bg-success{% else %}bg-secondary{% endif %}">
+        <span class="badge {% if status_name_by_id.get(ticket.status_id, '') == 'Новая' %}bg-info{% elif status_name_by_id.get(ticket.status_id, '') == 'В работе' %}bg-warning{% elif status_name_by_id.get(ticket.status_id, '') == 'Закрыт' %}bg-success{% else %}bg-secondary{% endif %}">
           {{ status_name_by_id.get(ticket.status_id, ticket.status_id) }}
         </span>
       </div>
@@ -274,11 +312,10 @@
         <div class="col-md-2">
           <label class="form-label small mb-1">⚡ Приоритет</label>
           <select name="priority" class="form-select form-select-sm">
-            {% for p in priorities %}
-              <option value="{{ p.value }}" {% if p.value == ticket.priority.value %}selected{% endif %}>
-                {{ p.value }}
-              </option>
-            {% endfor %}
+            <option value="low" {% if ticket.priority.value == 'low' %}selected{% endif %}>🔹 Низкий</option>
+            <option value="normal" {% if ticket.priority.value == 'normal' %}selected{% endif %}>🔸 Обычный</option>
+            <option value="high" {% if ticket.priority.value == 'high' %}selected{% endif %}>🔴 Высокий</option>
+            <option value="urgent" {% if ticket.priority.value == 'urgent' %}selected{% endif %}>🔴🔴 Критический</option>
           </select>
         </div>
         {% else %}
@@ -320,7 +357,7 @@
         <div class="col-md-3">
           <label class="form-label small mb-1">&nbsp;</label>
           <div class="d-flex gap-2">
-            {% if ticket.owner_id != agent.id %}
+            {% if can_assign_self and ticket.owner_id != agent.id %}
             <button type="submit" name="owner_id" value="{{ agent.id }}" class="btn btn-success btn-sm">
               👈 Себе
             </button>
@@ -334,11 +371,11 @@
         <!-- Нет прав на назначение -- показываем только кнопку "Себе" если можно назначить -->
         <div class="col-md-2">
           <label class="form-label small mb-1">&nbsp;</label>
-          {% if ticket.owner_id != agent.id %}
+          {% if can_assign_self and ticket.owner_id != agent.id %}
           <button type="submit" name="owner_id" value="{{ agent.id }}" class="btn btn-success btn-sm w-100">
             👈 Себе
           </button>
-          {% else %}
+          {% elif ticket.owner_id == agent.id %}
           <span class="badge bg-success">✅ На вас</span>
           {% endif %}
         </div>
@@ -348,8 +385,38 @@
   </div>
   {% endif %}
 
+  <!-- Кнопка переназначения (требует can_assign_others) -->
+  {% if can_assign_others and not ticket.is_archived %}
+  <div class="card mb-4">
+    <div class="card-header py-2">
+      <h6 class="mb-0">👤 Переназначить тикет</h6>
+    </div>
+    <div class="card-body py-3">
+      <form method="post" action="/tickets/{{ ticket.id }}/assign" class="row g-2 align-items-end">
+        <div class="col-md-4">
+          <label class="form-label small mb-1">Выберите оператора</label>
+          <select name="owner_id" class="form-select form-select-sm" required>
+            <option value="">— Выберите —</option>
+            {% for a in agents|default([]) %}
+              {% if a.id != agent.id %}
+              <option value="{{ a.id }}">{{ a.full_name }}</option>
+              {% endif %}
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label small mb-1">&nbsp;</label>
+          <button type="submit" class="btn btn-primary btn-sm w-100" onclick="return confirm('Переназначить тикет выбранному оператору?');">
+            📤 Переназначить
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+  {% endif %}
+
   <!-- Модальное окно анонимизации -->
-  {% if can_edit_tickets %}
+  {% if can_anonymize_tickets %}
   <div class="modal fade" id="anonymizeModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content">
@@ -523,14 +590,6 @@
                 <small class="text-muted">
                   {{ msg.created_at.strftime('%d.%m.%Y %H:%M') }}
                 </small>
-                {% if can_edit_tickets and not msg.is_internal and msg.customer_email %}
-                  <form method="POST" action="/messages/{{ msg.id }}/anonymize" class="d-inline"
-                        onsubmit="return confirm('⚠️ Вы уверены, что хотите анонимизировать сообщение?\n\nБудут удалены:\n- Имя отправителя\n- Email\n\nIP-адрес будет сохранён для аудита.');">
-                    <button type="submit" class="btn btn-sm btn-outline-secondary" title="Анонимизировать">
-                      🔒
-                    </button>
-                  </form>
-                {% endif %}
               </div>
             </div>
             <div class="message-body" style="white-space: pre-wrap;">{{ msg.body }}</div>

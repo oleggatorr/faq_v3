@@ -123,7 +123,7 @@
           <div class="col-md-4">
             <div>
               <small class="text-muted d-block">Статус</small>
-              <span class="badge {% if status_name_by_id.get(ticket.status_id, '') == 'Новый' %}bg-info{% elif status_name_by_id.get(ticket.status_id, '') == 'В работе' %}bg-warning{% elif status_name_by_id.get(ticket.status_id, '') == 'Закрыт' %}bg-success{% else %}bg-secondary{% endif %}">
+              <span class="badge {% if status_name_by_id.get(ticket.status_id, '') == 'Новая' %}bg-info{% elif status_name_by_id.get(ticket.status_id, '') == 'В работе' %}bg-warning{% elif status_name_by_id.get(ticket.status_id, '') == 'Закрыт' %}bg-success{% else %}bg-secondary{% endif %}">
                 {{ status_name_by_id.get(ticket.status_id, ticket.status_id) }}
               </span>
             </div>

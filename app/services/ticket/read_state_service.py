@@ -26,15 +26,12 @@ class TicketReadStateService:
 
         Обновляет last_read_message_id на максимальный ID сообщения в тикете.
         """
-        print(f"[DEBUG Service] mark_as_read: ticket_id={ticket_id}")
-        
         # Получаем максимальный ID сообщения в тикете
         max_message = self.session.query(Message).filter(
             Message.ticket_id == ticket_id
         ).order_by(Message.id.desc()).first()
 
         last_read_message_id = max_message.id if max_message else None
-        print(f"[DEBUG Service] last_read_message_id={last_read_message_id}")
 
         # Обновляем или создаём запись о состоянии прочтения
         read_state = self.session.query(TicketReadState).filter(
@@ -42,7 +39,6 @@ class TicketReadStateService:
         ).first()
 
         if read_state is None:
-            print(f"[DEBUG Service] creating new read_state")
             read_state = TicketReadState(
                 ticket_id=ticket_id,
                 last_read_message_id=last_read_message_id,
@@ -50,12 +46,10 @@ class TicketReadStateService:
             )
             self.session.add(read_state)
         else:
-            print(f"[DEBUG Service] updating existing read_state: old_last_read={read_state.last_read_message_id}")
             read_state.last_read_message_id = last_read_message_id
             read_state.last_read_at = datetime.now(timezone.utc)
 
         self.session.commit()  # ← Коммитим изменения в БД
-        print(f"[DEBUG Service] commit done, read_state saved")
 
     def get_unread_count(self, *, ticket_id: int, exclude_internal: bool = True) -> int:
         """

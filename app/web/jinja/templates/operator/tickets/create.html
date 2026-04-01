@@ -1,12 +1,11 @@
-{# ===== СОЗДАНИЕ ЗАЯВКИ (ПУБЛИЧНАЯ) ===== #}
+{# ===== СОЗДАНИЕ ТИКЕТА (ОПЕРАТОР) ===== #}
 
 {% extends "base.html" %}
 
-{% block title %}Создать заявку — Система поддержки{% endblock %}
+{% block title %}Создать тикет — Система поддержки{% endblock %}
 
 {% block extra_css %}
 <style>
-  /* Стили для страницы создания заявки */
   .form-section {
     background-color: #ffffff;
     border: 1px solid #e5e5e5;
@@ -15,7 +14,7 @@
     padding: 2rem;
     margin-bottom: 1.5rem;
   }
-  
+
   .form-section-title {
     color: #1e293b;
     font-weight: 600;
@@ -24,11 +23,11 @@
     padding-bottom: 0.75rem;
     border-bottom: 2px solid #e5e5e5;
   }
-  
+
   .form-control, .form-select {
     border-radius: 0 !important;
   }
-  
+
   .btn-submit {
     min-width: 200px;
     padding: 0.75rem 2rem;
@@ -40,13 +39,20 @@
 
 {% block content %}
 <div class="py-4">
+  <!-- Навигация -->
+  <div class="mb-4">
+    <a href="/tickets/my" class="btn btn-outline-secondary btn-sm">📋 Мои тикеты</a>
+    <a href="/tickets/all" class="btn btn-outline-secondary btn-sm ms-2">📂 Все тикеты</a>
+    <a href="/tickets/unassigned" class="btn btn-outline-secondary btn-sm ms-2">📥 Неназначенные</a>
+  </div>
+
   <!-- Заголовок -->
   <div class="text-center mb-4">
     <h1 class="h3 mb-2" style="color: #1e293b; font-weight: 600;">
-      📝 Создание заявки
+      ➕ Создание тикета
     </h1>
     <p class="text-muted small">
-      Заполните форму для создания обращения в службу поддержки
+      Заполните форму для создания тикета от имени клиента
     </p>
   </div>
 
@@ -57,17 +63,17 @@
     </div>
   {% endif %}
 
-  <form method="post" action="/new-ticket" enctype="multipart/form-data">
+  <form method="post" action="/tickets/create" enctype="multipart/form-data">
     <div class="row justify-content-center">
       <div class="col-lg-8">
-        
+
         <!-- Раздел 1: Контактные данные -->
         <div class="form-section">
-          <h2 class="form-section-title">👤 Контактные данные</h2>
-          
+          <h2 class="form-section-title">👤 Контактные данные клиента</h2>
+
           <div class="row g-3">
             <div class="col-md-6">
-              <label for="customer_name" class="form-label">Ваше имя <span class="text-danger">*</span></label>
+              <label for="customer_name" class="form-label">Имя клиента <span class="text-danger">*</span></label>
               <input
                 type="text"
                 class="form-control"
@@ -81,7 +87,7 @@
             </div>
 
             <div class="col-md-6">
-              <label for="customer_email" class="form-label">Email <span class="text-danger">*</span></label>
+              <label for="customer_email" class="form-label">Email клиента <span class="text-danger">*</span></label>
               <input
                 type="email"
                 class="form-control"
@@ -90,7 +96,7 @@
                 value="{{ form_data.customer_email or '' }}"
                 required
                 maxlength="255"
-                placeholder="ivan@example.com"
+                placeholder="client@example.com"
               />
             </div>
           </div>
@@ -99,7 +105,7 @@
         <!-- Раздел 2: Информация об обращении -->
         <div class="form-section">
           <h2 class="form-section-title">📋 Информация об обращении</h2>
-          
+
           <div class="row g-3">
             <div class="col-md-8">
               <label for="subject" class="form-label">Тема <span class="text-danger">*</span></label>
@@ -139,33 +145,22 @@
               </select>
             </div>
 
-            {% if agent %}
             <div class="col-md-6">
               <label for="priority" class="form-label">Приоритет</label>
               <select name="priority" id="priority" class="form-select">
-                {% for p in priorities %}
-                  <option value="{{ p.value }}" {% if form_data.priority == p.value %}selected{% endif %}>
-                    {% if p.value == 'low' %}
-                      🔹 Низкий
-                    {% elif p.value == 'normal' %}
-                      🔸 Обычный
-                    {% elif p.value == 'high' %}
-                      🔴 Высокий
-                    {% elif p.value == 'urgent' %}
-                      🔴🔴 Критический
-                    {% endif %}
-                  </option>
-                {% endfor %}
+                <option value="low">🔹 Низкий</option>
+                <option value="normal" selected>🔸 Обычный</option>
+                <option value="high">🔴 Высокий</option>
+                <option value="urgent">🔴🔴 Критический</option>
               </select>
             </div>
-            {% endif %}
           </div>
         </div>
 
         <!-- Раздел 3: Сообщение -->
         <div class="form-section">
           <h2 class="form-section-title">💬 Сообщение</h2>
-          
+
           <div class="mb-3">
             <label for="body" class="form-label">Текст обращения <span class="text-danger">*</span></label>
             <textarea
@@ -174,10 +169,10 @@
               name="body"
               rows="10"
               required
-              placeholder="Подробно опишите вашу проблему..."
+              placeholder="Подробно опишите проблему клиента..."
             >{{ form_data.body or '' }}</textarea>
             <small class="text-muted">
-              Опишите проблему максимально подробно — это поможет нам быстрее вам помочь
+              Опишите проблему максимально подробно
             </small>
           </div>
         </div>
@@ -185,7 +180,7 @@
         <!-- Раздел 4: Вложения -->
         <div class="form-section">
           <h2 class="form-section-title">📎 Вложения</h2>
-          
+
           <div class="mb-3">
             <label for="attachments" class="form-label">Прикрепить файлы</label>
             <input
@@ -204,11 +199,11 @@
         <!-- Кнопки -->
         <div class="text-center mt-4">
           <button type="submit" class="btn btn-primary btn-submit">
-            📤 Отправить обращение
+            📤 Создать тикет
           </button>
           <br>
-          <a href="/" class="btn btn-outline-secondary btn-sm mt-2">
-            ← На главную
+          <a href="/tickets/my" class="btn btn-outline-secondary btn-sm mt-2">
+            ← Отмена
           </a>
         </div>
 

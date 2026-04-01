@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, Depends
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
@@ -67,9 +67,45 @@ def home_page(agent: CurrentAgent):
 
 
 @router.get("/operator/home-page", response_class=HTMLResponse)
-def operator_home_page(request: Request, agent: CurrentAgent):
+def operator_home_page(request: Request, agent: CurrentAgent, db: Session = Depends(get_db)):
     """Домашняя страница оператора (требует авторизации)."""
+    from app.services.ticket.ticket_service import TicketService
+    from datetime import datetime, timezone
+    
+    ticket_service = TicketService(db, agent_id=agent.id)
+    
+    # Получаем все тикеты агента для статистики
+    my_tickets = ticket_service.list(
+        filters={"owner_id": agent.id, "is_archived": False},
+        limit=999999
+    )
+    
+    # Считаем статистику
+    total_my_tickets = len(my_tickets)
+    
+    # Ожидают ответа (статус "Новый" или сообщения от клиента)
+    awaiting_response = len([t for t in my_tickets if t.status_id == 1])
+    
+    # Решено сегодня (закрытые тикеты с updated_at сегодня)
+    today = datetime.now(tz=timezone.utc).date()
+    solved_today = len([
+        t for t in my_tickets 
+        if t.is_archived and t.updated_at and t.updated_at.date() == today
+    ])
+    
+    # В работе (не архив, не новый)
+    in_progress = len([t for t in my_tickets if t.status_id not in [1] and not t.is_archived])
+    
     return templates.TemplateResponse(
         "operator/home_page.html",
-        {"request": request, "agent": agent},
+        {
+            "request": request,
+            "agent": agent,
+            "stats": {
+                "total_my_tickets": total_my_tickets,
+                "awaiting_response": awaiting_response,
+                "solved_today": solved_today,
+                "in_progress": in_progress,
+            }
+        },
     )

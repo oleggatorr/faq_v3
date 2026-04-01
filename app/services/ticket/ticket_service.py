@@ -6,9 +6,11 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 from sqlalchemy.orm import Session
+from sqlalchemy import case
 
 from app.models.message import Message
 from app.models.ticket import Ticket
+from app.models.attachment import Attachment
 from app.models.ticket_status import TicketStatus
 from app.models.ticket_event import EventType, TicketEvent
 from app.schemas.deletion import DeleteResponse
@@ -18,7 +20,7 @@ from app.services.ticket.ticket_event_service import TicketEventService
 from app.services.ticket.ticket_base_service import TicketBaseService
 from app.services.ticket.read_state_service import TicketReadStateService
 from app.services.utils import apply_filters, apply_sort, format_preview
-from app.core.permissions import Permission
+from app.core.permissions import Permission, has_permission
 
 
 class TicketService(TicketBaseService):
@@ -128,21 +130,21 @@ class TicketService(TicketBaseService):
         self.session.add(message)
 
         # 3) Автоназначение оператора, если owner_id не указан
-        print(f"\n{'='*60}")
-        print(f"[AUTO-ASSIGN] Starting auto-assignment for ticket #{ticket.id}")
-        print(f"[AUTO-ASSIGN] owner_id={ticket_data.owner_id}, category_id={ticket.category_id}, department_id={ticket.department_id}")
+        #print(f"\n{'='*60}")
+        #print(f"[AUTO-ASSIGN] Starting auto-assignment for ticket #{ticket.id}")
+        #print(f"[AUTO-ASSIGN] owner_id={ticket_data.owner_id}, category_id={ticket.category_id}, department_id={ticket.department_id}")
         
         if ticket_data.owner_id is None and ticket.category_id is not None:
             try:
                 from app.services.ticket.assignment_service import AssignmentService
                 assignment_service = AssignmentService(self.session)
                 
-                print(f"[AUTO-ASSIGN] Calling get_available_operators...")
-                print(f"[AUTO-ASSIGN]   category_id={ticket.category_id}")
-                print(f"[AUTO-ASSIGN]   department_id=None (ищем по всем операторам)")
-                print(f"[AUTO-ASSIGN]   only_auto_assign=True")
-                print(f"[AUTO-ASSIGN]   include_inactive=False")
-                print(f"[AUTO-ASSIGN]   random=True")
+                #print(f"[AUTO-ASSIGN] Calling get_available_operators...")
+                #print(f"[AUTO-ASSIGN]   category_id={ticket.category_id}")
+                #print(f"[AUTO-ASSIGN]   department_id=None (ищем по всем операторам)")
+                #print(f"[AUTO-ASSIGN]   only_auto_assign=True")
+                #print(f"[AUTO-ASSIGN]   include_inactive=False")
+                #print(f"[AUTO-ASSIGN]   random=True")
                 
                 # Получаем случайного подходящего оператора
                 # department_id=None — ищем по ВСЕМ операторам с доступом к категории
@@ -154,30 +156,32 @@ class TicketService(TicketBaseService):
                     random=True,  # Случайный выбор
                 )
                 
-                print(f"[AUTO-ASSIGN] Found {len(operators)} suitable operators")
-                for i, op in enumerate(operators):
-                    print(f"[AUTO-ASSIGN]   [{i+1}] {op.agent.full_name} (login={op.agent.login}, auto_assign={op.agent.auto_assign}, score={op.score})")
+                #print(f"[AUTO-ASSIGN] Found {len(operators)} suitable operators")
+                #for i, op in enumerate(operators):
+                    #print(f"[AUTO-ASSIGN]   [{i+1}] {op.agent.full_name} (login={op.agent.login}, auto_assign={op.agent.auto_assign}, score={op.score})")
                 
                 # Назначаем первого подходящего оператора
                 if operators and len(operators) > 0:
                     selected_operator = operators[0]
                     ticket.owner_id = selected_operator.agent.id
-                    print(f"[AUTO-ASSIGN] ✅ Ticket #{ticket.id} assigned to {selected_operator.agent.full_name} (ID={selected_operator.agent.id})")
-                    print(f"[AUTO-ASSIGN]   Category: {ticket.category_id}")
-                    print(f"[AUTO-ASSIGN]   Department: {ticket.department_id}")
+                    #print(f"[AUTO-ASSIGN] ✅ Ticket #{ticket.id} assigned to {selected_operator.agent.full_name} (ID={selected_operator.agent.id})")
+                    #print(f"[AUTO-ASSIGN]   Category: {ticket.category_id}")
+                    #print(f"[AUTO-ASSIGN]   Department: {ticket.department_id}")
                 else:
-                    print(f"[AUTO-ASSIGN] ❌ No suitable operators found for category {ticket.category_id}")
+                    #print(f"[AUTO-ASSIGN] ❌ No suitable operators found for category {ticket.category_id}")
+                    pass
             except Exception as e:
-                print(f"[AUTO-ASSIGN] ❌ Error: {e}")
+                #print(f"[AUTO-ASSIGN] ❌ Error: {e}")
                 import traceback
                 traceback.print_exc()
         else:
-            if ticket_data.owner_id is not None:
-                print(f"[AUTO-ASSIGN] Skipped: owner_id already set to {ticket_data.owner_id}")
-            if ticket.category_id is None:
-                print(f"[AUTO-ASSIGN] Skipped: category_id is None")
+            #if ticket_data.owner_id is not None:
+                #print(f"[AUTO-ASSIGN] Skipped: owner_id already set to {ticket_data.owner_id}")
+            #if ticket.category_id is None:
+                #print(f"[AUTO-ASSIGN] Skipped: category_id is None")
+                pass
         
-        print(f"{'='*60}\n")
+        #print(f"{'='*60}\n")
 
         # 4) optionally create audit event
         if self.ticket_event_service is not None:
@@ -207,12 +211,27 @@ class TicketService(TicketBaseService):
         return TicketRead.model_validate(ticket)
 
     def get(self, *, ticket_id: int) -> TicketRead:
-        # Проверка права на просмотр тикетов
-        self._check_permission(Permission.can_view_tickets)
-
+        # Проверка права на просмотр тикета
         ticket = self.session.query(Ticket).filter(Ticket.id == ticket_id).one_or_none()
         if ticket is None:
             raise NotFound("Ticket not found")
+
+        # Проверяем права
+        agent = self._get_current_agent()
+        
+        # Админ всегда может смотреть
+        from app.core.auth import is_admin
+        if is_admin(agent):
+            pass  # Доступ разрешён
+        # Если агент является владельцем тикета — доступ разрешён
+        elif ticket.owner_id == agent.id:
+            pass  # Доступ разрешён
+        # Иначе требуется право can_view_tickets
+        elif not has_permission(agent, Permission.can_view_tickets):
+            raise AccessDeniedError(
+                detail="Нет прав на просмотр тикета",
+                required_permission="can_view_tickets",
+            )
         
         # Если тикет анонимизирован, заменяем данные на "Аноним"
         if ticket.is_anonymized:
@@ -280,12 +299,34 @@ class TicketService(TicketBaseService):
         if status_ids:
             query = query.filter(Ticket.status_id.in_(status_ids))
 
+        # Обработка owner_id = None (только неназначенные тикеты)
+        owner_id = filters.pop("owner_id", None)
+        if owner_id == "NULL":
+            # Фильтр: owner_id IS NULL (только неназначенные)
+            query = query.filter(Ticket.owner_id.is_(None))
+        elif owner_id is not None:
+            # Фильтр: owner_id = X
+            query = query.filter(Ticket.owner_id == owner_id)
+
         query = apply_filters(
             query,
             Ticket,
             filters=filters,
             text_like_fields={"track_id", "customer_name", "customer_email", "subject"},
         )
+
+        # Сортировка по приоритету (всегда первая, независимо от sort_by)
+        # urgent=1, high=2, normal=3, low=4
+        priority_order = case(
+            (Ticket.priority == "urgent", 1),
+            (Ticket.priority == "high", 2),
+            (Ticket.priority == "normal", 3),
+            (Ticket.priority == "low", 4),
+            else_=5
+        )
+        query = query.order_by(priority_order)
+
+        # Затем основная сортировка
         query = apply_sort(
             query,
             Ticket,
@@ -294,7 +335,7 @@ class TicketService(TicketBaseService):
             allowed_sort_fields=allowed_sort,
         )
         tickets = query.offset(offset).limit(limit).all()
-        
+
         # Если нужно включить unread_count, получаем его для каждого тикета
         ticket_read_list = []
         if include_unread and agent_id is not None:
@@ -740,6 +781,30 @@ class TicketService(TicketBaseService):
                 new_value=str(new_owner_id) if new_owner_id is not None else None,
             )
 
+        # Отправить email новому владельцу при назначении
+        if new_owner_id is not None and old_owner_id != new_owner_id:
+            try:
+                from app.services.agent_service import AgentService
+                from app.services.email_service import notify_ticket_assigned
+
+                agent_service = AgentService(self.session)
+                new_owner = agent_service.get(agent_id=new_owner_id)
+
+                if new_owner and new_owner.email:
+                    print(f"\n📧 ОТПРАВКА УВЕДОМЛЕНИЯ О НАЗНАЧЕНИИ:")
+                    print(f"   Тикет: {ticket.track_id}")
+                    print(f"   Тема: {ticket.subject}")
+                    print(f"   Назначен на: {new_owner.full_name} ({new_owner.email})")
+
+                    notify_ticket_assigned(
+                        to_email=new_owner.email,
+                        track_id=ticket.track_id,
+                        subject=ticket.subject,
+                        assigned_by=agent_id,
+                    )
+            except Exception as e:
+                print(f"⚠️ Не удалось отправить уведомление о назначении: {e}")
+
         if commit:
             self.session.commit()
         else:
@@ -788,7 +853,13 @@ class TicketService(TicketBaseService):
         agent_id: int | None,
         commit: bool = True,
     ) -> Ticket:
-        #///В разработке
+        """
+        Объединение тикетов.
+        
+        - Переносит все сообщения из source в target
+        - Устанавливает флаг merged_into_id
+        - Закрывает исходный тикет (статус "Решена" ID=4)
+        """
         if source_ticket_id == target_ticket_id:
             raise Conflict("Cannot merge a ticket into itself")
 
@@ -798,8 +869,26 @@ class TicketService(TicketBaseService):
             raise NotFound("Ticket not found")
 
         old_merged_into_id = source.merged_into_id
+        old_status_id = source.status_id
+        
+        # Перенос сообщений из source в target (вложения перенесутся через message)
+        messages = self.session.query(Message).filter(Message.ticket_id == source_ticket_id).all()
+        for msg in messages:
+            msg.ticket_id = target_ticket_id
+        
+        # Перенос событий истории
+        events = self.session.query(TicketEvent).filter(TicketEvent.ticket_id == source_ticket_id).all()
+        for ev in events:
+            ev.ticket_id = target_ticket_id
+        
+        # Устанавливаем флаг слияния
         source.merged_into_id = target.id
-
+        
+        # Закрываем исходный тикет (статус "Решена" ID=4)
+        RESOLVED_STATUS_ID = 4
+        source.status_id = RESOLVED_STATUS_ID
+        
+        # Логируем слияние
         if self.ticket_event_service is not None:
             self.ticket_event_service.add_event(
                 ticket_id=source.id,
@@ -809,6 +898,16 @@ class TicketService(TicketBaseService):
                 old_value=str(old_merged_into_id) if old_merged_into_id is not None else None,
                 new_value=str(target.id),
                 comment=f"Merged into ticket_id={target.id}",
+            )
+            # Логируем смену статуса
+            self.ticket_event_service.add_event(
+                ticket_id=source.id,
+                agent_id=agent_id,
+                action_type=EventType.status_changed,
+                field_name="status_id",
+                old_value=str(old_status_id),
+                new_value=str(RESOLVED_STATUS_ID),
+                comment="Автоматически: тикет объединён",
             )
 
         if commit:

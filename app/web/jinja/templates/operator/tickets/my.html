@@ -159,11 +159,11 @@
             <div class="col-md-2">
               <label class="form-label small text-muted mb-1">Сортировка</label>
               <select name="sort_by" class="form-select form-select-sm">
+                <option value="priority" {% if sort_by == 'priority' or not sort_by %}selected{% endif %}>Приоритет</option>
                 <option value="created_at" {% if sort_by == 'created_at' %}selected{% endif %}>Дата создания</option>
                 <option value="updated_at" {% if sort_by == 'updated_at' %}selected{% endif %}>Дата обновления</option>
                 <option value="track_id" {% if sort_by == 'track_id' %}selected{% endif %}>Трек-номер</option>
                 <option value="status_id" {% if sort_by == 'status_id' %}selected{% endif %}>Статус</option>
-                <option value="priority" {% if sort_by == 'priority' %}selected{% endif %}>Приоритет</option>
               </select>
             </div>
 
@@ -232,6 +232,11 @@
   </div>
   {% endif %}
 
+  <!-- Кнопка «Прочитать всё» -->
+  <div class="mb-3">
+    <button type="button" class="btn btn-sm btn-outline-success" onclick="markAllAsRead()" title="Прочитать все тикеты">✅ Прочитать всё</button>
+  </div>
+
   <!-- Таблица тикетов -->
   <div class="content-card">
     <!-- Панель действий с выделенными -->
@@ -242,16 +247,23 @@
         </span>
         <div class="btn-group" role="group">
           <button type="button" class="btn btn-sm btn-outline-success" onclick="applyToSelected('mark_read')" title="Прочитано">✅</button>
-          {% if can_del_tickets or agent.role == 'admin' %}
+          {% if can_archive_tickets or agent.role == 'admin' %}
           <button type="button" class="btn btn-sm btn-outline-primary" onclick="applyToSelected('archive')" title="В архив">🗑️</button>
           {% endif %}
           {% if can_hard_del_tickets or agent.role == 'admin' %}
           <button type="button" class="btn btn-sm btn-outline-danger" onclick="applyToSelected('hard_delete')" title="Удалить навсегда">🔥</button>
           {% endif %}
-          {% if can_assign_tickets or agent.role == 'admin' %}
-          <button type="button" class="btn btn-sm btn-outline-secondary" onclick="showAssignModal()" title="Назначить">👤</button>
+          {% if can_assign_self or agent.role == 'admin' %}
+          <button type="button" class="btn btn-sm btn-outline-success" onclick="applyToSelected('assign_self')" title="Назначить себе">👈</button>
+          {% endif %}
+          {% if can_assign_others or agent.role == 'admin' %}
+          <button type="button" class="btn btn-sm btn-outline-secondary" onclick="showAssignModal()" title="Назначить другим">👤</button>
+          {% endif %}
+          {% if can_merge_tickets or agent.role == 'admin' %}
+          <button type="button" class="btn btn-sm btn-outline-info" onclick="showMergeModal()" title="Объединить">🔗</button>
           {% endif %}
           <button type="button" class="btn btn-sm btn-outline-secondary" onclick="showStatusModal()" title="Статус">📊</button>
+          <button type="button" class="btn btn-sm btn-outline-secondary" onclick="showPriorityModal()" title="Приоритет">⚡</button>
         </div>
       </div>
     </div>
@@ -267,7 +279,7 @@
           <div class="modal-body">
             <p class="mb-2 small">Выберите оператора:</p>
             <select id="assignOwner" class="form-select form-select-sm">
-              <option value="">— Выберите —</option>
+              <option value="0">— Снять назначение —</option>
               {% for a in agents|default([]) %}
                 <option value="{{ a.id }}">{{ a.full_name }}</option>
               {% endfor %}
@@ -306,6 +318,31 @@
       </div>
     </div>
 
+    <!-- Модальное окно приоритета -->
+    <div class="modal fade" id="priorityModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header bg-info text-white">
+            <h6 class="modal-title fs-6">⚡ Изменить приоритет</h6>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <p class="mb-2 small">Выберите приоритет:</p>
+            <select id="changePriority" class="form-select form-select-sm">
+              <option value="low">🔹 Низкий</option>
+              <option value="normal">🔸 Обычный</option>
+              <option value="high">🔴 Высокий</option>
+              <option value="urgent">🔴🔴 Критический</option>
+            </select>
+          </div>
+          <div class="modal-footer py-2">
+            <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Отмена</button>
+            <button type="button" class="btn btn-sm btn-info" onclick="applyChangePriority()">Применить</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Модальное окно подтверждения удаления -->
     <div class="modal fade" id="deleteConfirmModal" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-dialog-centered">
@@ -326,6 +363,43 @@
       </div>
     </div>
 
+    <!-- Модальное окно объединения тикетов -->
+    <div class="modal fade" id="mergeModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header bg-info text-white">
+            <h6 class="modal-title fs-6">🔗 Объединить тикеты</h6>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <p class="mb-2 small">Выберите целевой тикет, в который будут объединены остальные:</p>
+            
+            <div class="mb-3">
+              <label class="form-label small">📋 Выбранные тикеты:</label>
+              <div id="mergeSelectedTickets" class="border rounded p-2 mb-2" style="max-height: 150px; overflow-y: auto;">
+                <!-- Список выбранных тикетов -->
+              </div>
+            </div>
+            
+            <div class="mb-3">
+              <label for="mergeTargetSelect" class="form-label small">Целевой тикет:</label>
+              <select class="form-select form-select-sm" id="mergeTargetSelect" required>
+                <option value="">— Выберите из выбранных —</option>
+              </select>
+            </div>
+            
+            <div class="alert alert-warning small mb-0">
+              ⚠️ <strong>Внимание:</strong> Все сообщения и вложения из выбранных тикетов будут перенесены в целевой тикет. Исходные тикеты будут закрыты.
+            </div>
+          </div>
+          <div class="modal-footer py-2">
+            <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Отмена</button>
+            <button type="button" class="btn btn-sm btn-info" onclick="applyMerge()">🔗 Объединить</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Таблица -->
     <div class="table-responsive">
       <table class="table table-hover mb-0">
@@ -337,6 +411,7 @@
             <th style="width: 120px;">Статус</th>
             <th style="width: 100px;">Приоритет</th>
             <th style="width: 120px;">Создан</th>
+            <th style="width: 80px;" class="text-center">📬</th>
             <th style="width: 50px;"></th>
           </tr>
         </thead>
@@ -354,7 +429,7 @@
                 <a href="/tickets/{{ t.id }}" class="text-decoration-none" title="{{ t.subject }}">{{ t.subject[:60] }}{% if t.subject|length > 60 %}...{% endif %}</a>
               </td>
               <td>
-                <span class="badge {% if status_name_by_id.get(t.status_id, '') == 'Новый' %}bg-info{% elif status_name_by_id.get(t.status_id, '') == 'В работе' %}bg-warning{% elif status_name_by_id.get(t.status_id, '') == 'Закрыт' %}bg-success{% else %}bg-secondary{% endif %}">
+                <span class="badge {% if status_name_by_id.get(t.status_id, '') == 'Новая' %}bg-info{% elif status_name_by_id.get(t.status_id, '') == 'В работе' %}bg-warning{% elif status_name_by_id.get(t.status_id, '') == 'Закрыт' %}bg-success{% else %}bg-secondary{% endif %}">
                   {{ status_name_by_id.get(t.status_id, t.status_id) }}
                 </span>
               </td>
@@ -364,6 +439,13 @@
                 </span>
               </td>
               <td class="text-muted small">{{ t.created_at.strftime('%d.%m.%Y') }}</td>
+              <td class="text-center">
+                {% if t.unread_count and t.unread_count > 0 %}
+                  <span class="unread-badge">{{ t.unread_count }}</span>
+                {% else %}
+                  <span class="text-muted">—</span>
+                {% endif %}
+              </td>
               <td>
                 <a href="/tickets/{{ t.id }}" class="btn btn-sm btn-outline-primary">→</a>
               </td>
@@ -371,7 +453,7 @@
             {% endfor %}
           {% else %}
             <tr>
-              <td colspan="7" class="text-center text-muted py-5">
+              <td colspan="8" class="text-center text-muted py-5">
                 <div style="font-size: 3rem; margin-bottom: 1rem;">📋</div>
                 <p>Нет тикетов для отображения</p>
                 <a href="/tickets/unassigned" class="btn btn-primary btn-sm mt-2">📥 Взять из неназначенных</a>
@@ -528,12 +610,8 @@ function showAssignModal() {
 function applyAssign() {
   const ticketIds = getSelectedIds();
   const ownerId = document.getElementById('assignOwner').value;
-  
-  if (!ownerId) {
-    alert('Выберите оператора');
-    return;
-  }
-  
+
+  // owner_id = "0" означает снятие назначения
   const form = document.createElement('form');
   form.method = 'POST';
   form.action = '/tickets/bulk-operation';
@@ -542,7 +620,7 @@ function applyAssign() {
     <input type="hidden" name="operation" value="assign">
     <input type="hidden" name="owner_id" value="${ownerId}">
   `;
-  
+
   document.body.appendChild(form);
   form.submit();
 }
@@ -561,12 +639,12 @@ function showStatusModal() {
 function applyChangeStatus() {
   const ticketIds = getSelectedIds();
   const statusId = document.getElementById('changeStatus').value;
-  
+
   if (!statusId) {
     alert('Выберите статус');
     return;
   }
-  
+
   const form = document.createElement('form');
   form.method = 'POST';
   form.action = '/tickets/bulk-operation';
@@ -575,7 +653,145 @@ function applyChangeStatus() {
     <input type="hidden" name="operation" value="change_status">
     <input type="hidden" name="status_id" value="${statusId}">
   `;
+
+  document.body.appendChild(form);
+  form.submit();
+}
+
+// Показать модальное окно объединения
+function showMergeModal() {
+  const ticketIds = getSelectedIds();
+  if (ticketIds.length === 0) {
+    alert('Выберите тикеты для объединения');
+    return;
+  }
+  if (ticketIds.length < 2) {
+    alert('Выберите хотя бы 2 тикета для объединения');
+    return;
+  }
   
+  // Очищаем поля
+  document.getElementById('mergeTargetSelect').innerHTML = '<option value="">— Выберите из выбранных —</option>';
+  document.getElementById('mergeTargetSelect').value = '';
+  
+  // Загружаем информацию о выбранных тикетах
+  const selectedList = document.getElementById('mergeSelectedTickets');
+  selectedList.innerHTML = '<div class="text-muted small">Загрузка...</div>';
+  
+  // Получаем данные о тикетах из таблицы
+  const ticketsData = [];
+  ticketIds.forEach(id => {
+    const row = document.getElementById('row-' + id);
+    if (row) {
+      const trackEl = row.querySelector('.ticket-track-id');
+      const subjectEl = row.querySelector('a[href^="/tickets/"]');
+      if (trackEl && subjectEl) {
+        ticketsData.push({
+          id: id,
+          track_id: trackEl.textContent.trim(),
+          subject: subjectEl.getAttribute('title') || subjectEl.textContent.trim()
+        });
+      }
+    }
+  });
+  
+  // Отображаем список
+  if (ticketsData.length > 0) {
+    selectedList.innerHTML = ticketsData.map(t => 
+      `<div class="small mb-1">
+        <strong>${t.track_id}</strong> — ${t.subject.substring(0, 50)}${t.subject.length > 50 ? '...' : ''}
+      </div>`
+    ).join('');
+    
+    // Заполняем select
+    const select = document.getElementById('mergeTargetSelect');
+    ticketsData.forEach(t => {
+      const option = document.createElement('option');
+      option.value = t.id;
+      option.textContent = `${t.track_id} — ${t.subject.substring(0, 40)}${t.subject.length > 40 ? '...' : ''}`;
+      select.appendChild(option);
+    });
+  } else {
+    selectedList.innerHTML = '<div class="text-danger small">Не удалось загрузить данные тикетов</div>';
+  }
+  
+  new bootstrap.Modal(document.getElementById('mergeModal')).show();
+}
+
+// Применить объединение
+function applyMerge() {
+  const ticketIds = getSelectedIds();
+  const select = document.getElementById('mergeTargetSelect');
+  const targetId = select.value;
+  
+  if (!targetId) {
+    alert('Выберите целевой тикет из списка');
+    return;
+  }
+  
+  // Проверяем, сколько тикетов будет объединено
+  const sourcesCount = ticketIds.filter(id => id != targetId).length;
+  if (sourcesCount < 1) {
+    alert('Выберите хотя бы один тикет для объединения с целевым');
+    return;
+  }
+  
+  const targetText = select.options[select.selectedIndex]?.text;
+  if (!confirm(`Объединить выбранные тикеты в ${targetText}?`)) {
+    return;
+  }
+  
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = '/tickets/bulk-operation';
+  form.innerHTML = `
+    <input type="hidden" name="ticket_ids" value='${JSON.stringify(ticketIds)}'>
+    <input type="hidden" name="operation" value="merge">
+    <input type="hidden" name="target_ticket_id" value="${targetId}">
+  `;
+  
+  document.body.appendChild(form);
+  form.submit();
+}
+
+// Отметить все тикеты как прочитанные
+function markAllAsRead() {
+  if (!confirm('Отметить все тикеты как прочитанные?')) {
+    return;
+  }
+  
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = '/tickets/my/mark-all-read';
+  
+  document.body.appendChild(form);
+  form.submit();
+}
+
+// Показать модальное окно приоритета
+function showPriorityModal() {
+  const ticketIds = getSelectedIds();
+  if (ticketIds.length === 0) {
+    alert('Выберите тикеты');
+    return;
+  }
+  new bootstrap.Modal(document.getElementById('priorityModal')).show();
+}
+
+// Применить приоритет
+function applyChangePriority() {
+  const ticketIds = getSelectedIds();
+  const priority = document.getElementById('changePriority').value;
+
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = '/tickets/bulk-operation';
+  form.innerHTML = `
+    <input type="hidden" name="ticket_ids" value='${JSON.stringify(ticketIds)}'>
+    <input type="hidden" name="operation" value="change_priority">
+    <input type="hidden" name="priority" value="${priority}">
+  `;
+
   document.body.appendChild(form);
   form.submit();
 }

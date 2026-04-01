@@ -199,6 +199,15 @@ def ticket_messages_by_track_id(
             status_code=404,
         )
 
+    # Если тикет объединён с другим, перенаправляем на родительский
+    if ticket.merged_into_id:
+        if agent:
+            return RedirectResponse(url=f"/tickets/{ticket.merged_into_id}", status_code=303)
+        else:
+            # Для публичного доступа получаем родительский тикет
+            parent_ticket = ticket_service.get(ticket_id=ticket.merged_into_id)
+            return RedirectResponse(url=f"/ticket/{parent_ticket.track_id}/message", status_code=303)
+
     if agent:
         return RedirectResponse(url=f"/tickets/{ticket.id}", status_code=303)
 

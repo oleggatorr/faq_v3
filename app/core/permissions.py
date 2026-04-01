@@ -20,12 +20,12 @@ class Permission(str, Enum):
     can_man_canned = "can_man_canned"
     can_man_ticket_tpl = "can_man_ticket_tpl"
     can_man_settings = "can_man_settings"
-    can_add_archive = "can_add_archive"
-    can_assign_self = "can_assign_self"
+    can_anonymize_tickets = "can_anonymize_tickets"
+    can_archive_tickets = "can_archive_tickets"
     can_assign_others = "can_assign_others"
+    can_assign_self = "can_assign_self"
     can_view_unassigned = "can_view_unassigned"
     can_view_ass_others = "can_view_ass_others"
-    can_view_ass_by = "can_view_ass_by"
     can_run_reports = "can_run_reports"
     can_run_reports_full = "can_run_reports_full"
     can_export = "can_export"
@@ -70,12 +70,12 @@ PERMISSION_LABELS = {
     Permission.can_man_canned: "Управление шаблонными ответами",
     Permission.can_man_ticket_tpl: "Управление шаблонами тикетов",
     Permission.can_man_settings: "Управление настройками системы",
-    Permission.can_add_archive: "Добавление в архив",
-    Permission.can_assign_self: "Назначение тикета себе",
+    Permission.can_anonymize_tickets: "Анонимизация тикетов",
+    Permission.can_archive_tickets: "Отправка в архив",
     Permission.can_assign_others: "Назначение тикетов другим",
+    Permission.can_assign_self: "Назначение тикета себе",
     Permission.can_view_unassigned: "Просмотр неназначенных тикетов",
     Permission.can_view_ass_others: "Просмотр тикетов других операторов",
-    Permission.can_view_ass_by: "Просмотр назначенных по пользователю",
     Permission.can_run_reports: "Просмотр отчетов",
     Permission.can_run_reports_full: "Полный доступ к отчетам",
     Permission.can_export: "Экспорт данных",
@@ -114,11 +114,10 @@ PERMISSION_GROUPS = {
         Permission.can_assign_others,
         Permission.can_view_unassigned,
         Permission.can_view_ass_others,
-        Permission.can_view_ass_by,
     ],
     "Заметки и архив": [
         Permission.can_del_notes,
-        Permission.can_add_archive,
+        Permission.can_archive_tickets,
     ],
     "Администрирование": [
         Permission.can_man_users,
@@ -139,6 +138,7 @@ PERMISSION_GROUPS = {
         Permission.can_ban_ips,
         Permission.can_unban_ips,
         Permission.can_privacy,
+        Permission.can_anonymize_tickets,
     ],
     "Прочее": [
         Permission.can_view_online,

@@ -510,16 +510,27 @@ async def new_ticket_submit(
         )
 
         # Уведомление департаменту о новом обращении
-        from app.services.email_service import notify_ticket_created
+        from app.services.email_service import notify_ticket_created, notify_ticket_created_customer
         dept = db.query(Department).filter(Department.id == ticket.department_id).one_or_none()
-        to_email = (dept.email if dept and dept.email else None) or "olegfesenko365@gmail.com"
+        to_email_dept = (dept.email if dept and dept.email else None) or "olegfesenko365@gmail.com"
         try:
             notify_ticket_created(
-                to_email=to_email,
+                to_email=to_email_dept,
                 track_id=ticket.track_id,
                 subject=ticket.subject,
                 customer_name=ticket.customer_name,
                 body_preview=body.strip(),
+            )
+        except Exception:
+            pass
+        
+        # Уведомление пользователю о создании тикета
+        try:
+            notify_ticket_created_customer(
+                to_email=ticket.customer_email,
+                track_id=ticket.track_id,
+                subject=ticket.subject,
+                customer_name=ticket.customer_name,
             )
         except Exception:
             pass

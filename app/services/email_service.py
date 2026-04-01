@@ -182,3 +182,29 @@ def notify_ticket_assigned(
         f"Тема: {subject}\n\n"
         f"Пожалуйста, обработайте обращение в ближайшее время.",
     )
+
+
+def notify_ticket_created_customer(
+    *,
+    to_email: str,
+    track_id: str,
+    subject: str,
+    customer_name: str,
+) -> None:
+    """Уведомление пользователя о создании тикета (подтверждение)."""
+    print(f"\n📬 notify_ticket_created_customer вызван:")
+    print(f"   to_email={to_email}")
+    print(f"   track_id={track_id}")
+    print(f"   subject={subject}")
+    print(f"   customer_name={customer_name}")
+
+    send_email(
+        to=to_email,
+        subject=f"[Заявка принята {track_id}] {subject}",
+        body=f"Здравствуйте, {customer_name}!\n\n"
+        f"Ваше обращение принято в работу.\n\n"
+        f"Трек-номер: {track_id}\n"
+        f"Тема: {subject}\n\n"
+        f"Сохраните трек-номер для отслеживания статуса обращения.\n"
+        f"Вы получите уведомление при изменении статуса или получении ответа.",
+    )

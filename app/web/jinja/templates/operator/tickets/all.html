@@ -64,6 +64,26 @@
     padding: 0.125rem 0.5rem;
     border-radius: 9999px;
   }
+
+  .status-checkboxes {
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid #dee2e6;
+    border-radius: 0.25rem;
+    padding: 0.5rem;
+    background-color: #fff;
+  }
+
+  .status-checkbox-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.25rem;
+  }
+
+  .status-checkbox-item:last-child {
+    margin-bottom: 0;
+  }
 </style>
 {% endblock %}
 
@@ -114,15 +134,17 @@
             </select>
           </div>
 
-          <!-- Статус -->
+          <!-- Статусы (чекбоксы) -->
           <div class="col-md-2">
-            <label class="form-label small text-muted mb-1">Статус</label>
-            <select name="status_id" class="form-select form-select-sm">
-              <option value="">Все</option>
+            <label class="form-label small text-muted mb-1">Статусы</label>
+            <div class="status-checkboxes">
               {% for s in statuses %}
-                <option value="{{ s.id }}" {% if status_id == s.id|string %}selected{% endif %}>{{ s.name }}</option>
+                <div class="status-checkbox-item">
+                  <input type="checkbox" class="form-check-input" name="status_ids" value="{{ s.id }}" id="status-{{ s.id }}" {% if status_ids and s.id|string in status_ids %}checked{% endif %} />
+                  <label class="form-check-label small" for="status-{{ s.id }}">{{ s.name }}</label>
+                </div>
               {% endfor %}
-            </select>
+            </div>
           </div>
 
           <!-- Архив -->
@@ -173,6 +195,54 @@
       </form>
     </div>
   </div>
+
+  <!-- Пагинация (верхняя) -->
+  {% if total_count and total_count > 0 %}
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <p class="text-muted small mb-0">
+      Всего тикетов: <strong>{{ total_count }}</strong>
+      {% if limit_int and limit_int > 0 %}
+        | Страниц: <strong>{{ (total_count + limit_int - 1) // limit_int }}</strong>
+      {% endif %}
+    </p>
+    {% if tickets and tickets|length > 0 %}
+    <nav>
+      <ul class="pagination pagination-sm mb-0">
+        {% set current_page = (offset_int // limit_int) + 1 if offset_int and limit_int and limit_int > 0 else 1 %}
+        {% set total_pages = (total_count + limit_int - 1) // limit_int if limit_int and limit_int > 0 else 1 %}
+        
+        {% if current_page > 1 %}
+          <li class="page-item">
+            <a class="page-link" href="?offset=0&limit={{ limit_int }}{% if status_ids %}{% for sid in status_ids %}&status_ids={{ sid }}{% endfor %}{% endif %}{% if q %}&q={{ q }}{% endif %}{% if owner_filter %}&owner_filter={{ owner_filter }}{% endif %}{% if owner_id %}&owner_id={{ owner_id }}{% endif %}{% if archived %}&archived={{ archived }}{% endif %}{% if sort_by %}&sort_by={{ sort_by }}{% endif %}{% if sort_desc %}&sort_desc=true{% endif %}">Первая</a>
+          </li>
+          <li class="page-item">
+            <a class="page-link" href="?offset={{ (current_page - 2) * limit_int }}&limit={{ limit_int }}{% if status_ids %}{% for sid in status_ids %}&status_ids={{ sid }}{% endfor %}{% endif %}{% if q %}&q={{ q }}{% endif %}{% if owner_filter %}&owner_filter={{ owner_filter }}{% endif %}{% if owner_id %}&owner_id={{ owner_id }}{% endif %}{% if archived %}&archived={{ archived }}{% endif %}{% if sort_by %}&sort_by={{ sort_by }}{% endif %}{% if sort_desc %}&sort_desc=true{% endif %}">← Назад</a>
+          </li>
+        {% endif %}
+
+        {% for p in range(1, total_pages + 1) %}
+          {% if p == current_page %}
+            <li class="page-item active"><span class="page-link">{{ p }}</span></li>
+          {% elif p >= current_page - 2 and p <= current_page + 2 %}
+            <li class="page-item">
+              <a class="page-link" href="?offset={{ (p - 1) * limit_int }}&limit={{ limit_int }}{% if status_ids %}{% for sid in status_ids %}&status_ids={{ sid }}{% endfor %}{% endif %}{% if q %}&q={{ q }}{% endif %}{% if owner_filter %}&owner_filter={{ owner_filter }}{% endif %}{% if owner_id %}&owner_id={{ owner_id }}{% endif %}{% if archived %}&archived={{ archived }}{% endif %}{% if sort_by %}&sort_by={{ sort_by }}{% endif %}{% if sort_desc %}&sort_desc=true{% endif %}">{{ p }}</a>
+            </li>
+          {% endif %}
+        {% endfor %}
+
+        {% if current_page < total_pages %}
+          <li class="page-item">
+            <a class="page-link" href="?offset={{ current_page * limit_int }}&limit={{ limit_int }}{% if status_ids %}{% for sid in status_ids %}&status_ids={{ sid }}{% endfor %}{% endif %}{% if q %}&q={{ q }}{% endif %}{% if owner_filter %}&owner_filter={{ owner_filter }}{% endif %}{% if owner_id %}&owner_id={{ owner_id }}{% endif %}{% if archived %}&archived={{ archived }}{% endif %}{% if sort_by %}&sort_by={{ sort_by }}{% endif %}{% if sort_desc %}&sort_desc=true{% endif %}">Вперёд →</a>
+          </li>
+          <li class="page-item">
+            <a class="page-link" href="?offset={{ (total_pages - 1) * limit_int }}&limit={{ limit_int }}{% if status_ids %}{% for sid in status_ids %}&status_ids={{ sid }}{% endfor %}{% endif %}{% if q %}&q={{ q }}{% endif %}{% if owner_filter %}&owner_filter={{ owner_filter }}{% endif %}{% if owner_id %}&owner_id={{ owner_id }}{% endif %}{% if archived %}&archived={{ archived }}{% endif %}{% if sort_by %}&sort_by={{ sort_by }}{% endif %}{% if sort_desc %}&sort_desc=true{% endif %}">Последняя</a>
+          </li>
+        {% endif %}
+      </ul>
+    </nav>
+    {% endif %}
+  </div>
+  {% endif %}
 
   <!-- Таблица тикетов -->
   <div class="content-card">
@@ -280,7 +350,6 @@
             <th style="width: 100px;">Статус</th>
             <th style="width: 100px;">Приоритет</th>
             <th style="width: 120px;">Создан</th>
-            <th style="width: 80px;" class="text-center">📬</th>
             <th style="width: 50px;"></th>
           </tr>
         </thead>
@@ -315,13 +384,6 @@
                 </span>
               </td>
               <td class="text-muted small">{{ t.created_at.strftime('%d.%m.%Y') }}</td>
-              <td class="text-center">
-                {% if t.unread_count and t.unread_count > 0 %}
-                  <span class="unread-badge">{{ t.unread_count }}</span>
-                {% else %}
-                  <span class="text-muted">—</span>
-                {% endif %}
-              </td>
               <td>
                 <a href="/tickets/{{ t.id }}" class="btn btn-sm btn-outline-primary">→</a>
               </td>
@@ -329,7 +391,7 @@
             {% endfor %}
           {% else %}
             <tr>
-              <td colspan="9" class="text-center text-muted py-5">
+              <td colspan="8" class="text-center text-muted py-5">
                 <div style="font-size: 3rem; margin-bottom: 1rem;">📂</div>
                 <p>Нет тикетов для отображения</p>
               </td>
@@ -339,20 +401,42 @@
       </table>
     </div>
 
-    <!-- Пагинация -->
+    <!-- Пагинация (нижняя) -->
     {% if tickets and tickets|length > 0 %}
     <div class="d-flex justify-content-between align-items-center p-3">
-      <p class="text-muted small mb-0">Показано {{ tickets|length }} из {{ total_count if total_count else tickets|length }}</p>
+      <div>
+        <p class="text-muted small mb-0">Показано {{ tickets|length }} из {{ total_count if total_count else tickets|length }}</p>
+        <p class="text-muted small mb-0 mt-1"><strong>Всего тикетов по выборке: {{ total_count if total_count else tickets|length }}</strong></p>
+      </div>
+      {% set total_pages = (total_count + limit_int - 1) // limit_int if limit_int and limit_int > 0 else 1 %}
+      {% set current_page = (offset_int // limit_int) + 1 if offset_int and limit_int and limit_int > 0 else 1 %}
       <nav>
         <ul class="pagination pagination-sm mb-0">
-          {% if offset_int and offset_int > 0 %}
+          {% if current_page > 1 %}
             <li class="page-item">
-              <a class="page-link" href="?offset={{ offset_int - limit_int if offset_int - limit_int > 0 else 0 }}&limit={{ limit_int }}">← Назад</a>
+              <a class="page-link" href="?offset=0&limit={{ limit_int }}{% if status_ids %}{% for sid in status_ids %}&status_ids={{ sid }}{% endfor %}{% endif %}{% if q %}&q={{ q }}{% endif %}{% if owner_filter %}&owner_filter={{ owner_filter }}{% endif %}{% if owner_id %}&owner_id={{ owner_id }}{% endif %}{% if archived %}&archived={{ archived }}{% endif %}{% if sort_by %}&sort_by={{ sort_by }}{% endif %}{% if sort_desc %}&sort_desc=true{% endif %}">Первая</a>
+            </li>
+            <li class="page-item">
+              <a class="page-link" href="?offset={{ (current_page - 2) * limit_int }}&limit={{ limit_int }}{% if status_ids %}{% for sid in status_ids %}&status_ids={{ sid }}{% endfor %}{% endif %}{% if q %}&q={{ q }}{% endif %}{% if owner_filter %}&owner_filter={{ owner_filter }}{% endif %}{% if owner_id %}&owner_id={{ owner_id }}{% endif %}{% if archived %}&archived={{ archived }}{% endif %}{% if sort_by %}&sort_by={{ sort_by }}{% endif %}{% if sort_desc %}&sort_desc=true{% endif %}">← Назад</a>
             </li>
           {% endif %}
-          {% if tickets|length == limit_int %}
+
+          {% for p in range(1, total_pages + 1) %}
+            {% if p == current_page %}
+              <li class="page-item active"><span class="page-link">{{ p }}</span></li>
+            {% elif p >= current_page - 2 and p <= current_page + 2 %}
+              <li class="page-item">
+                <a class="page-link" href="?offset={{ (p - 1) * limit_int }}&limit={{ limit_int }}{% if status_ids %}{% for sid in status_ids %}&status_ids={{ sid }}{% endfor %}{% endif %}{% if q %}&q={{ q }}{% endif %}{% if owner_filter %}&owner_filter={{ owner_filter }}{% endif %}{% if owner_id %}&owner_id={{ owner_id }}{% endif %}{% if archived %}&archived={{ archived }}{% endif %}{% if sort_by %}&sort_by={{ sort_by }}{% endif %}{% if sort_desc %}&sort_desc=true{% endif %}">{{ p }}</a>
+              </li>
+            {% endif %}
+          {% endfor %}
+
+          {% if current_page < total_pages %}
             <li class="page-item">
-              <a class="page-link" href="?offset={{ offset_int + limit_int }}&limit={{ limit_int }}">Вперёд →</a>
+              <a class="page-link" href="?offset={{ current_page * limit_int }}&limit={{ limit_int }}{% if status_ids %}{% for sid in status_ids %}&status_ids={{ sid }}{% endfor %}{% endif %}{% if q %}&q={{ q }}{% endif %}{% if owner_filter %}&owner_filter={{ owner_filter }}{% endif %}{% if owner_id %}&owner_id={{ owner_id }}{% endif %}{% if archived %}&archived={{ archived }}{% endif %}{% if sort_by %}&sort_by={{ sort_by }}{% endif %}{% if sort_desc %}&sort_desc=true{% endif %}">Вперёд →</a>
+            </li>
+            <li class="page-item">
+              <a class="page-link" href="?offset={{ (total_pages - 1) * limit_int }}&limit={{ limit_int }}{% if status_ids %}{% for sid in status_ids %}&status_ids={{ sid }}{% endfor %}{% endif %}{% if q %}&q={{ q }}{% endif %}{% if owner_filter %}&owner_filter={{ owner_filter }}{% endif %}{% if owner_id %}&owner_id={{ owner_id }}{% endif %}{% if archived %}&archived={{ archived }}{% endif %}{% if sort_by %}&sort_by={{ sort_by }}{% endif %}{% if sort_desc %}&sort_desc=true{% endif %}">Последняя</a>
             </li>
           {% endif %}
         </ul>

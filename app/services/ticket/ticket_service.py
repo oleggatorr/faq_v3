@@ -244,6 +244,7 @@ class TicketService(TicketBaseService):
             "language_id",
             "category_id",
             "status_id",
+            "status_ids",
             "priority",
             "subject",
             "owner_id",
@@ -273,6 +274,12 @@ class TicketService(TicketBaseService):
                 raise ValueError(f"Unknown filter fields: {', '.join(sorted(unknown))}")
 
         query = self.session.query(Ticket)
+
+        # Обработка множественного фильтра по статусам
+        status_ids = filters.pop("status_ids", None)
+        if status_ids:
+            query = query.filter(Ticket.status_id.in_(status_ids))
+
         query = apply_filters(
             query,
             Ticket,

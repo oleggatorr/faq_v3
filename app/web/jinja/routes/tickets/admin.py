@@ -321,7 +321,7 @@ def tickets_my(
     request: Request,
     agent: AgentRead = Depends(check_can_view_own_tickets),  # Право на просмотр своих тикетов
     db: Session = Depends(get_db),
-    status_id: str | None = Query(None),
+    status_ids: list[str] = Query([], description="Multiple status IDs"),
     category_id: str | None = Query(None),
     sort_by: str = Query("created_at", description="Sort field"),
     sort_desc: bool = Query(True, description="Sort descending"),
@@ -344,11 +344,11 @@ def tickets_my(
     filters = {"owner_id": agent.id}
 
     # Преобразуем пустые строки в None
-    status_id_int = int(status_id) if status_id and status_id.strip() else None
+    status_ids_int = [int(s) for s in status_ids if s and s.strip()]
     category_id_int = int(category_id) if category_id and category_id.strip() else None
 
-    if status_id_int:
-        filters["status_id"] = status_id_int
+    if status_ids_int:
+        filters["status_ids"] = status_ids_int
     if category_id_int:
         filters["category_id"] = category_id_int
 
@@ -394,7 +394,7 @@ def tickets_my(
             "agents": agents,
             "category_name_by_id": category_name_by_id,
             "status_name_by_id": status_name_by_id,
-            "status_id": status_id,
+            "status_ids": status_ids,
             "category_id": category_id,
             "sort_by": sort_by,
             "sort_desc": sort_desc,
@@ -414,7 +414,7 @@ def tickets_all(
     agent: AgentRead = Depends(check_can_view_all_tickets),  # Право на просмотр всех тикетов
     db: Session = Depends(get_db),
     q: str = Query("", description="Quick search by track_id/subject/customer"),
-    status_id: str | None = Query(None),
+    status_ids: list[str] = Query([], description="Multiple status IDs"),
     category_id: str | None = Query(None),
     sort_by: str = Query("created_at", description="Sort field"),
     sort_desc: bool = Query(True, description="Sort descending"),
@@ -437,11 +437,11 @@ def tickets_all(
     filters = _ticket_filters(request)
 
     # Преобразуем пустые строки в None
-    status_id_int = int(status_id) if status_id and status_id.strip() else None
+    status_ids_int = [int(s) for s in status_ids if s and s.strip()]
     category_id_int = int(category_id) if category_id and category_id.strip() else None
 
-    if status_id_int:
-        filters["status_id"] = status_id_int
+    if status_ids_int:
+        filters["status_ids"] = status_ids_int
     if category_id_int:
         filters["category_id"] = category_id_int
 
@@ -502,6 +502,7 @@ def tickets_all(
             "archived": archived,
             "owner_filter": owner_filter,
             "owner_id": owner_id,
+            "status_ids": status_ids,
             "total_count": total_count,
             "limit_int": limit_int,
             "offset_int": offset_int,

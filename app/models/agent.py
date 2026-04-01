@@ -14,7 +14,7 @@ class Agent(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     full_name = Column(String(200), nullable=False, index=True)
-    email = Column(String(255), unique=True, nullable=False, index=True)
+    email = Column(String(255), nullable=False, index=True)
     login = Column(String(100), unique=True, nullable=False, index=True)
     password_hash = Column(String(255), nullable=False)
     role = Column(SQLEnum(AgentRole), nullable=False, default=AgentRole.operator, index=True)

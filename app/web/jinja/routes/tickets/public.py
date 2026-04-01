@@ -509,13 +509,37 @@ async def new_ticket_submit(
             **client_info,
         )
 
-        # Уведомление департаменту о новом обращении
+        # Уведомление о новом обращении (оператору или департаменту)
         from app.services.email_service import notify_ticket_created, notify_ticket_created_customer
-        dept = db.query(Department).filter(Department.id == ticket.department_id).one_or_none()
-        to_email_dept = (dept.email if dept and dept.email else None) or "olegfesenko365@gmail.com"
+        from app.services.agent_service import AgentService
+
+        # Определяем получателя уведомления
+        to_email_notify = None
+
+        # Сначала пробуем отправить оператору, если тикет назначен
+        if ticket.owner_id:
+            try:
+                agent_service = AgentService(db)
+                assigned_agent = agent_service.get(agent_id=ticket.owner_id)
+                # Проверяем, включены ли email-уведомления у оператора
+                if assigned_agent and assigned_agent.email and assigned_agent.email_notifications:
+                    to_email_notify = assigned_agent.email
+                    print(f"📧 Уведомление отправляется оператору: {assigned_agent.full_name} ({to_email_notify})")
+                elif assigned_agent and not assigned_agent.email_notifications:
+                    print(f"⚠️ У оператора {assigned_agent.full_name} отключены email-уведомления")
+            except Exception:
+                pass
+
+        # Если оператор не назначен или нет email — отправляем департаменту
+        if not to_email_notify:
+            dept = db.query(Department).filter(Department.id == ticket.department_id).one_or_none()
+            to_email_notify = (dept.email if dept and dept.email else None) or "olegfesenko365@gmail.com"
+            print(f"📧 Уведомление отправляется департаменту: {to_email_notify}")
+
+        # Отправляем уведомление
         try:
             notify_ticket_created(
-                to_email=to_email_dept,
+                to_email=to_email_notify,
                 track_id=ticket.track_id,
                 subject=ticket.subject,
                 customer_name=ticket.customer_name,
@@ -523,7 +547,7 @@ async def new_ticket_submit(
             )
         except Exception:
             pass
-        
+
         # Уведомление пользователю о создании тикета
         try:
             notify_ticket_created_customer(

@@ -790,7 +790,7 @@ class TicketService(TicketBaseService):
                 agent_service = AgentService(self.session)
                 new_owner = agent_service.get(agent_id=new_owner_id)
 
-                if new_owner and new_owner.email:
+                if new_owner and new_owner.email and new_owner.email_notifications:
                     print(f"\n📧 ОТПРАВКА УВЕДОМЛЕНИЯ О НАЗНАЧЕНИИ:")
                     print(f"   Тикет: {ticket.track_id}")
                     print(f"   Тема: {ticket.subject}")
@@ -802,6 +802,8 @@ class TicketService(TicketBaseService):
                         subject=ticket.subject,
                         assigned_by=agent_id,
                     )
+                elif new_owner and not new_owner.email_notifications:
+                    print(f"⚠️ У оператора {new_owner.full_name} отключены email-уведомления")
             except Exception as e:
                 print(f"⚠️ Не удалось отправить уведомление о назначении: {e}")
 

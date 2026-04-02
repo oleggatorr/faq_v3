@@ -385,6 +385,7 @@ def tickets_my(
     # Словари для быстрого поиска имён
     category_name_by_id = {c.id: c.name for c in categories}
     status_name_by_id = {s.id: s.name for s in statuses}
+    agent_name_by_id = {a.id: a.full_name for a in agents}
 
     # Получаем общее количество для пагинации
     all_tickets = ticket_service.list(
@@ -404,6 +405,7 @@ def tickets_my(
             "agents": agents,
             "category_name_by_id": category_name_by_id,
             "status_name_by_id": status_name_by_id,
+            "agent_name_by_id": agent_name_by_id,
             "status_ids": status_ids,
             "category_id": category_id,
             "sort_by": sort_by,

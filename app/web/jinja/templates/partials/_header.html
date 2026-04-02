@@ -1,40 +1,75 @@
 {# ===== ФРАГМЕНТ: ШАПКА / HEADER ===== #}
 {# Двухуровневая навигация #}
 
-{# ВЕРХНЯЯ ПАНЕЛЬ: Логотип + Профиль #}
+{# ВЕРХНЯЯ ПАНЕЛЬ: Логотип + Кнопки + Профиль #}
 <div class="top-navbar border-bottom bg-white">
   <div class="container px-4">
-    <div class="d-flex justify-content-between align-items-center py-2">
+    <div class="d-flex flex-wrap justify-content-between align-items-center py-2 gap-2">
       {# Логотип #}
       <a class="navbar-brand d-flex align-items-center" href="/">
         <img src="/static/stc/logo_5.png" alt="Logo" height="40" class="me-2" />
-        <span class="fw-semibold text-dark fs-5">Система поддержки</span>
       </a>
 
-      {# Профиль / Вход #}
-      {% if agent %}
-        <div class="dropdown">
-          <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-            👤 {{ agent.login }}
-            <span class="badge {% if agent.role == 'admin' %}bg-danger{% else %}bg-secondary{% endif %} ms-1">
-              {% if agent.role == 'admin' %}Админ{% else %}Оператор{% endif %}
-            </span>
+      {# Быстрые кнопки + Профиль #}
+      <div class="d-flex align-items-center gap-2 flex-wrap">
+        {# Десктоп: все кнопки в ряд #}
+        <div class="d-none d-md-flex align-items-center gap-2">
+          <a class="btn btn-sm btn-outline-secondary" href="http://edms.hmmr.ru/" target="_blank" title="Система документооборота">
+            📋 Документооборот
           </a>
+          <a class="btn btn-sm btn-outline-secondary" href="http://10.168.130.13:1234/publish.htm" target="_blank" title="Медицинская информационная система">
+            🏥 МЕС Windows
+          </a>
+          <a class="btn btn-sm btn-outline-secondary" href="http://helpdesk.hmmr.ru/downloads/mes-android-client.apk" target="_blank" title="МЕС для Android">
+            📱 МЕС Android
+          </a>
+          <a class="btn btn-sm btn-outline-secondary" href="/documents" target="_blank" title="Электронная почта">
+            📧 Почта
+          </a>
+          <a class="btn btn-sm btn-outline-primary" href="http://helpdesk.hmmr.ru/" title="Система поддержки">
+            🎧 Поддержка
+          </a>
+        </div>
+
+        {# Мобильные: кнопка меню #}
+        <div class="dropdown d-md-none">
+          <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+            ☰ Ссылки
+          </button>
           <ul class="dropdown-menu dropdown-menu-end">
-            <li><a class="dropdown-item" href="/accaunt">⚙️ Настройки</a></li>
-            <li><hr class="dropdown-divider"></li>
-            <li>
-              <form method="post" action="/logout" class="d-inline">
-                <button type="submit" class="dropdown-item text-danger">🚪 Выход</button>
-              </form>
-            </li>
+            <li><a class="dropdown-item" href="http://edms.hmmr.ru/" target="_blank">📋 Документооборот</a></li>
+            <li><a class="dropdown-item" href="http://10.168.130.13:1234/publish.htm" target="_blank">🏥 МЕС Windows</a></li>
+            <li><a class="dropdown-item" href="http://helpdesk.hmmr.ru/downloads/mes-android-client.apk" target="_blank">📱 МЕС Android</a></li>
+            <li><a class="dropdown-item" href="/documents" target="_blank">📧 Почта</a></li>
+            <li><a class="dropdown-item" href="http://helpdesk.hmmr.ru/">🎧 Поддержка</a></li>
           </ul>
         </div>
-      {% else %}
-        <a href="/login" class="btn btn-outline-primary btn-sm">
-            🔐 Войти
-        </a>
-      {% endif %}
+
+        {# Профиль / Вход #}
+        {% if agent %}
+          <div class="dropdown">
+            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+              👤 {{ agent.login }}
+              <span class="badge {% if agent.role == 'admin' %}bg-danger{% else %}bg-secondary{% endif %} ms-1">
+                {% if agent.role == 'admin' %}Админ{% else %}Оператор{% endif %}
+              </span>
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li><a class="dropdown-item" href="/accaunt">⚙️ Настройки</a></li>
+              <li><hr class="dropdown-divider"></li>
+              <li>
+                <form method="post" action="/logout" class="d-inline">
+                  <button type="submit" class="dropdown-item text-danger">🚪 Выход</button>
+                </form>
+              </li>
+            </ul>
+          </div>
+        {% else %}
+          <a href="/login" class="btn btn-outline-primary btn-sm">
+              🔐 Войти
+          </a>
+        {% endif %}
+      </div>
     </div>
   </div>
 </div>
@@ -109,34 +144,6 @@
         </a>
       </li>
       {% endif %}
-    </ul>
-  </div>
-</div>
-{% else %}
-{# НИЖНЯЯ ПАНЕЛЬ: 4 кнопки для гостей #}
-<div class="bottom-navbar bg-light border-bottom">
-  <div class="container px-4">
-    <ul class="nav justify-content-center py-2">
-      <li class="nav-item">
-        <a class="nav-link px-4" href="/mail" target="_blank">
-          📧 Почта
-        </a>
-      </li>
-      <li class="nav-item">
-        <a class="nav-link px-4" href="/1c" target="_blank">
-          📘 1С
-        </a>
-      </li>
-      <li class="nav-item">
-        <a class="nav-link px-4" href="/documents" target="_blank">
-          📄 Документы
-        </a>
-      </li>
-      <li class="nav-item">
-        <a class="nav-link px-4" href="/" class="active">
-          🎧 Поддержка
-        </a>
-      </li>
     </ul>
   </div>
 </div>

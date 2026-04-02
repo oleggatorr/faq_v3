@@ -341,12 +341,17 @@ async def ticket_public_reply(
         to_email = None
         if ticket.owner_id:
             owner_agent = db.query(Agent).filter(Agent.id == ticket.owner_id).one_or_none()
-            if owner_agent and owner_agent.email:
+            # Проверяем, включены ли email-уведомления у оператора
+            if owner_agent and owner_agent.email and owner_agent.email_notifications:
                 to_email = owner_agent.email
+                print(f"📧 Уведомление о новом сообщении отправляется оператору: {owner_agent.full_name} ({to_email})")
+            elif owner_agent and not owner_agent.email_notifications:
+                print(f"⚠️ У оператора {owner_agent.full_name} отключены email-уведомления")
         if not to_email and ticket.department_id:
             dept = db.query(Department).filter(Department.id == ticket.department_id).one_or_none()
             if dept and dept.email:
                 to_email = dept.email
+                print(f"📧 Уведомление о новом сообщении отправляется департаменту: {to_email}")
         if to_email:
             notify_new_message(
                 to_email=to_email,

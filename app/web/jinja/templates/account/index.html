@@ -1,0 +1,145 @@
+{# ===== СТРАНИЦА АККАУНТА ===== #}
+
+{% extends "base.html" %}
+
+{% block title %}Мой аккаунт — Система поддержки{% endblock %}
+
+{% block content %}
+<div class="py-4">
+  <div class="row">
+    <div class="col-md-8">
+      <!-- Форма редактирования -->
+      <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <h5 class="mb-0">✏️ Редактировать профиль</h5>
+        </div>
+        <div class="card-body">
+          <form method="POST" action="/account/update">
+            <div class="row mb-3">
+              <div class="col-md-6">
+                <label for="full_name" class="form-label">ФИО *</label>
+                <input type="text" class="form-control" id="full_name" name="full_name" value="{{ agent.full_name }}" required>
+              </div>
+              <div class="col-md-6">
+                <label for="login" class="form-label">Логин *</label>
+                <input type="text" class="form-control" id="login" name="login" value="{{ agent.login }}" required>
+              </div>
+            </div>
+            
+            <div class="row mb-3">
+              <div class="col-md-6">
+                <label for="email" class="form-label">Email *</label>
+                <input type="email" class="form-control" id="email" name="email" value="{{ agent.email }}" required>
+              </div>
+              <div class="col-md-6">
+                <label for="phone" class="form-label">Телефон</label>
+                <input type="text" class="form-control" id="phone" name="phone" value="{{ agent.phone or '' }}">
+              </div>
+            </div>
+            
+            <div class="mb-3">
+              <label for="signature" class="form-label">Подпись в письмах</label>
+              <textarea class="form-control" id="signature" name="signature" rows="3" placeholder="С уважением, ...">{{ agent.signature or '' }}</textarea>
+            </div>
+            
+            <hr class="my-4">
+            
+            <h6 class="mb-3">🔐 Смена пароля</h6>
+            <div class="row mb-3">
+              <div class="col-md-6">
+                <label for="current_password" class="form-label">Текущий пароль *</label>
+                <input type="password" class="form-control" id="current_password" name="current_password" required>
+              </div>
+              <div class="col-md-6">
+                <label for="new_password" class="form-label">Новый пароль</label>
+                <input type="password" class="form-control" id="new_password" name="new_password" placeholder="Оставьте пустым, чтобы не менять">
+              </div>
+            </div>
+            
+            <div class="d-flex gap-2">
+              <button type="submit" class="btn btn-primary">💾 Сохранить</button>
+              <a href="/account" class="btn btn-outline-secondary">Отмена</a>
+            </div>
+          </form>
+        </div>
+      </div>
+      
+      <!-- Информация -->
+      <div class="card">
+        <div class="card-header">
+          <h5 class="mb-0">📊 Информация об аккаунте</h5>
+        </div>
+        <div class="card-body">
+          <div class="row mb-3">
+            <div class="col-md-6">
+              <p class="text-muted small mb-1">Роль</p>
+              <p>
+                <span class="badge {% if agent.role == 'admin' %}bg-danger{% elif agent.role == 'operator' %}bg-info{% else %}bg-secondary{% endif %}">
+                  {{ agent.role }}
+                </span>
+              </p>
+            </div>
+            <div class="col-md-6">
+              <p class="text-muted small mb-1">Департамент</p>
+              <p class="fw-medium">{{ agent.department.name if agent.department else '—' }}</p>
+            </div>
+          </div>
+          
+          <div class="row mb-3">
+            <div class="col-md-6">
+              <p class="text-muted small mb-1">Последний вход</p>
+              <p class="fw-medium">{{ agent.last_login_at.strftime('%d.%m.%Y %H:%M') if agent.last_login_at else '—' }}</p>
+            </div>
+            <div class="col-md-6">
+              <p class="text-muted small mb-1">Статус</p>
+              <p>
+                {% if agent.is_active %}
+                  <span class="badge bg-success">✅ Активен</span>
+                {% else %}
+                  <span class="badge bg-danger">❌ Заблокирован</span>
+                {% endif %}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="col-md-4">
+      <div class="card">
+        <div class="card-header">
+          <h6 class="mb-0">📋 Права доступа</h6>
+        </div>
+        <div class="card-body">
+          <ul class="small mb-0">
+            {% if can_view_own_tickets %}<li class="mb-1">✅ Просмотр своих тикетов</li>{% endif %}
+            {% if can_view_unassigned %}<li class="mb-1">✅ Просмотр неназначенных</li>{% endif %}
+            {% if can_view_ass_others %}<li class="mb-1">✅ Просмотр чужих тикетов</li>{% endif %}
+            {% if can_submit_any_cat %}<li class="mb-1">✅ Создание тикетов</li>{% endif %}
+            {% if can_reply_tickets %}<li class="mb-1">✅ Ответы в тикетах</li>{% endif %}
+            {% if can_edit_tickets %}<li class="mb-1">✅ Редактирование тикетов</li>{% endif %}
+            {% if can_archive_tickets %}<li class="mb-1">✅ Архивирование</li>{% endif %}
+            {% if can_del_tickets %}<li class="mb-1">✅ Удаление тикетов</li>{% endif %}
+            {% if can_hard_del_tickets %}<li class="mb-1">✅ Полное удаление</li>{% endif %}
+            {% if can_assign_self %}<li class="mb-1">✅ Назначить себе</li>{% endif %}
+            {% if can_assign_others %}<li class="mb-1">✅ Назначить другим</li>{% endif %}
+            {% if can_merge_tickets %}<li class="mb-1">✅ Объединение тикетов</li>{% endif %}
+            {% if can_resolve %}<li class="mb-1">✅ Закрытие тикетов</li>{% endif %}
+          </ul>
+        </div>
+      </div>
+      
+      <div class="card mt-3">
+        <div class="card-header">
+          <h6 class="mb-0">🚪 Действия</h6>
+        </div>
+        <div class="card-body">
+          <form method="POST" action="/logout" style="display: inline;">
+            <button type="submit" class="btn btn-outline-danger btn-sm w-100">🚪 Выйти</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

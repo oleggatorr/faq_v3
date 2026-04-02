@@ -117,7 +117,10 @@
             <div class="status-checkboxes">
               {% for s in statuses %}
                 <div class="status-checkbox-item">
-                  <input type="checkbox" class="form-check-input" name="status_ids" value="{{ s.id }}" id="status-{{ s.id }}" {% if status_ids and s.id|string in status_ids %}checked{% endif %} />
+                  {% set default_status_ids = ['1', '2'] %}
+                  <input type="checkbox" class="form-check-input" name="status_ids" value="{{ s.id }}" id="status-{{ s.id }}" 
+                    {% if status_ids and s.id|string in status_ids %}checked
+                    {% elif not status_ids and s.id|string in default_status_ids %}checked{% endif %} />
                   <label class="form-check-label small" for="status-{{ s.id }}">{{ s.name }}</label>
                 </div>
               {% endfor %}
@@ -159,8 +162,8 @@
             <div class="col-md-2">
               <label class="form-label small text-muted mb-1">Сортировка</label>
               <select name="sort_by" class="form-select form-select-sm">
-                <option value="priority" {% if sort_by == 'priority' or not sort_by %}selected{% endif %}>Приоритет</option>
-                <option value="created_at" {% if sort_by == 'created_at' %}selected{% endif %}>Дата создания</option>
+                <option value="priority" {% if sort_by == 'priority' %}selected{% endif %}>Приоритет</option>
+                <option value="created_at" {% if sort_by == 'created_at' or not sort_by %}selected{% endif %}>Дата создания</option>
                 <option value="updated_at" {% if sort_by == 'updated_at' %}selected{% endif %}>Дата обновления</option>
                 <option value="track_id" {% if sort_by == 'track_id' %}selected{% endif %}>Трек-номер</option>
                 <option value="status_id" {% if sort_by == 'status_id' %}selected{% endif %}>Статус</option>
@@ -171,6 +174,7 @@
               <div class="form-check mt-4">
                 <input type="checkbox" class="form-check-input" name="sort_desc" value="true" id="sort_desc" {% if sort_desc %}checked{% endif %} />
                 <label class="form-check-label small" for="sort_desc">По убыванию</label>
+                <small class="text-muted d-block mt-1" style="font-size: 0.7rem;">По умолчанию: по возрастанию</small>
               </div>
             </div>
 
@@ -185,12 +189,17 @@
   </div>
 
   <!-- Пагинация (верхняя) -->
-  {% if total_count and total_count > 0 %}
+  {% if tickets and tickets|length > 0 %}
   <div class="d-flex justify-content-between align-items-center mb-3">
     <p class="text-muted small mb-0">
-      Всего тикетов: <strong>{{ total_count }}</strong>
-      {% if limit_int and limit_int > 0 %}
-        | Страниц: <strong>{{ (total_count + limit_int - 1) // limit_int }}</strong>
+      <strong>{{ tickets|length }}</strong> тикетов на странице
+      {% if total_count %}
+        (всего по выборке: <strong>{{ total_count }}</strong>
+        {% if limit_int and limit_int > 0 %}
+          , страниц: <strong>{{ (total_count + limit_int - 1) // limit_int }}</strong>)
+        {% else %}
+          )
+        {% endif %}
       {% endif %}
     </p>
     {% if tickets and tickets|length > 0 %}
@@ -252,9 +261,6 @@
           {% endif %}
           {% if can_hard_del_tickets or agent.role == 'admin' %}
           <button type="button" class="btn btn-sm btn-outline-danger" onclick="applyToSelected('hard_delete')" title="Удалить навсегда">🔥</button>
-          {% endif %}
-          {% if can_assign_self or agent.role == 'admin' %}
-          <button type="button" class="btn btn-sm btn-outline-success" onclick="applyToSelected('assign_self')" title="Назначить себе">👈</button>
           {% endif %}
           {% if can_assign_others or agent.role == 'admin' %}
           <button type="button" class="btn btn-sm btn-outline-secondary" onclick="showAssignModal()" title="Назначить другим">👤</button>
@@ -406,13 +412,14 @@
         <thead>
           <tr>
             <th style="width: 40px;"><input type="checkbox" class="form-check-input" id="selectAll" onchange="toggleSelectAll()"></th>
-            <th style="width: 100px;">Трек</th>
+            <th style="width: 110px; white-space: nowrap;">Трек</th>
+            <th style="width: 150px;">Категория</th>
             <th>Тема</th>
-            <th style="width: 120px;">Статус</th>
-            <th style="width: 100px;">Приоритет</th>
-            <th style="width: 120px;">Создан</th>
-            <th style="width: 80px;" class="text-center">📬</th>
-            <th style="width: 50px;"></th>
+            <th style="width: 100px;">Статус</th>
+            <th style="width: 120px;">Исполнитель</th>
+            <th style="width: 110px; white-space: nowrap;">Дата создания</th>
+            <th style="width: 110px;">Приоритет</th>
+            <th style="width: 90px; text-align: center;">📬 Непрочитанные</th>
           </tr>
         </thead>
         <tbody>
@@ -422,8 +429,11 @@
               <td>
                 <input type="checkbox" class="form-check-input ticket-checkbox" value="{{ t.id }}" onchange="updateSelectedCount()">
               </td>
-              <td>
+              <td style="white-space: nowrap;">
                 <a href="/tickets/{{ t.id }}" class="ticket-track-id">{{ t.track_id }}</a>
+              </td>
+              <td>
+                <span class="badge bg-secondary">{{ category_name_by_id.get(t.category_id, '—') }}</span>
               </td>
               <td>
                 <a href="/tickets/{{ t.id }}" class="text-decoration-none" title="{{ t.subject }}">{{ t.subject[:60] }}{% if t.subject|length > 60 %}...{% endif %}</a>
@@ -434,11 +444,18 @@
                 </span>
               </td>
               <td>
+                {% if t.owner_id %}
+                  <span class="badge bg-info">{{ agent_name_by_id.get(t.owner_id, 'Оператор') }}</span>
+                {% else %}
+                  <span class="badge bg-warning text-dark">⚠️ Не назначен</span>
+                {% endif %}
+              </td>
+              <td style="white-space: nowrap;" class="text-muted small">{{ t.created_at.strftime('%d.%m.%Y') }}</td>
+              <td>
                 <span class="badge {% if t.priority.value == 'high' %}bg-danger{% elif t.priority.value == 'normal' %}bg-info{% elif t.priority.value == 'urgent' %}bg-danger{% else %}bg-secondary{% endif %}">
                   {% if t.priority.value == 'low' %}🔹 Низкий{% elif t.priority.value == 'normal' %}🔸 Обычный{% elif t.priority.value == 'high' %}🔴 Высокий{% elif t.priority.value == 'urgent' %}🔴🔴 Критический{% endif %}
                 </span>
               </td>
-              <td class="text-muted small">{{ t.created_at.strftime('%d.%m.%Y') }}</td>
               <td class="text-center">
                 {% if t.unread_count and t.unread_count > 0 %}
                   <span class="unread-badge">{{ t.unread_count }}</span>
@@ -446,14 +463,11 @@
                   <span class="text-muted">—</span>
                 {% endif %}
               </td>
-              <td>
-                <a href="/tickets/{{ t.id }}" class="btn btn-sm btn-outline-primary">→</a>
-              </td>
             </tr>
             {% endfor %}
           {% else %}
             <tr>
-              <td colspan="8" class="text-center text-muted py-5">
+              <td colspan="9" class="text-center text-muted py-5">
                 <div style="font-size: 3rem; margin-bottom: 1rem;">📋</div>
                 <p>Нет тикетов для отображения</p>
                 <a href="/tickets/unassigned" class="btn btn-primary btn-sm mt-2">📥 Взять из неназначенных</a>
@@ -468,8 +482,9 @@
     {% if tickets and tickets|length > 0 %}
     <div class="d-flex justify-content-between align-items-center p-3">
       <div>
-        <p class="text-muted small mb-0">Показано {{ tickets|length }} из {{ total_count if total_count else tickets|length }}</p>
-        <p class="text-muted small mb-0 mt-1"><strong>Всего тикетов по выборке: {{ total_count if total_count else tickets|length }}</strong></p>
+        <p class="text-muted small mb-0">
+          Страница <strong>{{ (offset_int // limit_int) + 1 if offset_int and limit_int and limit_int > 0 else 1 }}</strong> из <strong>{{ (total_count + limit_int - 1) // limit_int if total_count and limit_int and limit_int > 0 else 1 }}</strong>
+        </p>
       </div>
       {% set total_pages = (total_count + limit_int - 1) // limit_int if limit_int and limit_int > 0 else 1 %}
       {% set current_page = (offset_int // limit_int) + 1 if offset_int and limit_int and limit_int > 0 else 1 %}

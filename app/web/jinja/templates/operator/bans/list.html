@@ -7,6 +7,201 @@
 {% block content %}
 <div class="py-4">
   <h1 class="h3 mb-4">🚫 Баны</h1>
-  <p class="text-muted">Страница управления банами</p>
+  
+  {# Вкладки #}
+  <ul class="nav nav-tabs mb-4" id="bansTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+      <button class="nav-link active" id="emails-tab" data-bs-toggle="tab" data-bs-target="#emails" type="button" role="tab">
+        📧 Баны Email
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="ips-tab" data-bs-toggle="tab" data-bs-target="#ips" type="button" role="tab">
+        🌐 Баны IP
+      </button>
+    </li>
+  </ul>
+
+  <div class="tab-content" id="bansTabsContent">
+    
+    {# ===== Вкладка Email ===== #}
+    <div class="tab-pane fade show active" id="emails" role="tabpanel">
+      <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <h5 class="mb-0">📧 Забаненные Email</h5>
+          <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addEmailModal">
+            ➕ Добавить бан
+          </button>
+        </div>
+        <div class="card-body">
+          {% if banned_emails %}
+          <div class="table-responsive">
+            <table class="table table-hover">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Email</th>
+                  <th>Причина</th>
+                  <th>Забанил</th>
+                  <th>Дата</th>
+                  <th>Действия</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for ban in banned_emails %}
+                <tr>
+                  <td>{{ ban.id }}</td>
+                  <td><code>{{ ban.email }}</code></td>
+                  <td>{{ ban.reason or '—' }}</td>
+                  <td>
+                    {% if ban.banned_by_agent %}
+                      {{ ban.banned_by_agent.login }}
+                    {% else %}
+                      <span class="text-muted">Удалён</span>
+                    {% endif %}
+                  </td>
+                  <td>{{ ban.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
+                  <td>
+                    <form method="POST" action="/bans/email/remove" style="display: inline;">
+                      <input type="hidden" name="ban_id" value="{{ ban.id }}">
+                      <button type="submit" class="btn btn-sm btn-outline-danger" 
+                              onclick="return confirm('Разбанить email {{ ban.email }}?')">
+                        🔓 Разбанить
+                      </button>
+                    </form>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+          <p class="text-muted mb-0">Забаненных email нет</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    {# ===== Вкладка IP ===== #}
+    <div class="tab-pane fade" id="ips" role="tabpanel">
+      <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <h5 class="mb-0">🌐 Забаненные IP</h5>
+          <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addIpModal">
+            ➕ Добавить бан
+          </button>
+        </div>
+        <div class="card-body">
+          {% if banned_ips %}
+          <div class="table-responsive">
+            <table class="table table-hover">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>IP диапазон</th>
+                  <th>Забанил</th>
+                  <th>Дата</th>
+                  <th>Действия</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for ban in banned_ips %}
+                <tr>
+                  <td>{{ ban.id }}</td>
+                  <td><code>{{ ban.ip_display }}</code></td>
+                  <td>
+                    {% if ban.banned_by_agent %}
+                      {{ ban.banned_by_agent.login }}
+                    {% else %}
+                      <span class="text-muted">Удалён</span>
+                    {% endif %}
+                  </td>
+                  <td>{{ ban.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
+                  <td>
+                    <form method="POST" action="/bans/ip/remove" style="display: inline;">
+                      <input type="hidden" name="ban_id" value="{{ ban.id }}">
+                      <button type="submit" class="btn btn-sm btn-outline-danger" 
+                              onclick="return confirm('Разбанить IP {{ ban.ip_display }}?')">
+                        🔓 Разбанить
+                      </button>
+                    </form>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+          <p class="text-muted mb-0">Забаненных IP нет</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+{# ===== Модальное окно: Добавить Email ===== #}
+<div class="modal fade" id="addEmailModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="POST" action="/bans/email/add">
+        <div class="modal-header">
+          <h5 class="modal-title">📧 Забанить Email</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="email" class="form-label">Email *</label>
+            <input type="email" class="form-control" id="email" name="email" required>
+          </div>
+          <div class="mb-3">
+            <label for="email_reason" class="form-label">Причина</label>
+            <textarea class="form-control" id="email_reason" name="reason" rows="3"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+          <button type="submit" class="btn btn-danger">🚫 Забанить</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{# ===== Модальное окно: Добавить IP ===== #}
+<div class="modal fade" id="addIpModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="POST" action="/bans/ip/add">
+        <div class="modal-header">
+          <h5 class="modal-title">🌐 Забанить IP</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="ip_from" class="form-label">IP (начало) *</label>
+            <input type="text" class="form-control" id="ip_from" name="ip_from" 
+                   placeholder="192.168.1.1" required>
+          </div>
+          <div class="mb-3">
+            <label for="ip_to" class="form-label">IP (конец диапазона)</label>
+            <input type="text" class="form-control" id="ip_to" name="ip_to" 
+                   placeholder="192.168.1.100">
+            <small class="text-muted">Оставьте пустым для одиночного IP</small>
+          </div>
+          <div class="mb-3">
+            <label for="ip_display" class="form-label">Отображение</label>
+            <input type="text" class="form-control" id="ip_display" name="ip_display" 
+                   placeholder="192.168.1.*">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+          <button type="submit" class="btn btn-danger">🚫 Забанить</button>
+        </div>
+      </form>
+    </div>
+  </div>
 </div>
 {% endblock %}

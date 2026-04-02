@@ -27,6 +27,69 @@ def account_page(request: Request, agent: CurrentAgent):
     )
 
 
+@router.post("/account/update")
+def account_update(
+    request: Request,
+    db: Session = Depends(get_db),
+    agent: CurrentAgent = None,
+    full_name: str = Form(...),
+    login: str = Form(...),
+    email: str = Form(...),
+    phone: str = Form(""),
+    signature: str = Form(""),
+    current_password: str = Form(...),
+    new_password: str = Form(""),
+):
+    """Обновление профиля текущего агента."""
+    # Проверка текущего пароля
+    if not verify_password(current_password, agent.password_hash):
+        request.session["flash_error"] = "Неверный текущий пароль"
+        return RedirectResponse(url="/accaunt", status_code=303)
+
+    # Проверка уникальности логина (если изменён)
+    if login != agent.login:
+        existing = db.query(Agent).filter(Agent.login == login, Agent.id != agent.id).one_or_none()
+        if existing:
+            request.session["flash_error"] = "Такой логин уже занят"
+            return RedirectResponse(url="/accaunt", status_code=303)
+
+    # Проверка уникальности email (если изменён)
+    if email != agent.email:
+        existing = db.query(Agent).filter(Agent.email == email, Agent.id != agent.id).one_or_none()
+        if existing:
+            request.session["flash_error"] = "Такой email уже используется"
+            return RedirectResponse(url="/accaunt", status_code=303)
+
+    # Обновление данных
+    agent.full_name = full_name
+    agent.login = login
+    agent.email = email
+    agent.phone = phone.strip() if phone else None
+    agent.signature = signature.strip() if signature else None
+
+    # Смена пароля (если указан новый)
+    if new_password and new_password.strip():
+        from app.core.security import get_password_hash
+        agent.password_hash = get_password_hash(new_password)
+
+    db.commit()
+
+    # Логирование
+    client_info = get_client_info(request)
+    log_service = AuditLogService(db)
+    log_service.log_action(
+        action="profile_update",
+        entity_type="agent",
+        entity_id=agent.id,
+        agent_id=agent.id,
+        details={"changes": ["full_name", "login", "email", "phone", "signature"] + (["password"] if new_password else [])},
+        **client_info,
+    )
+
+    request.session["flash_success"] = "Профиль успешно обновлён"
+    return RedirectResponse(url="/accaunt", status_code=303)
+
+
 @router.get("/login", response_class=HTMLResponse)
 def login_page(
     request: Request,
